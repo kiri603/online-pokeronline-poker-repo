@@ -18,7 +18,7 @@
 ## 技术栈
 
 - **前端：** Vue 3, Vite, CSS Flexbox 
-- **后端：** Java 17, Spring Boot, WebSocket
+- **后端：** Java 25, Spring Boot, WebSocket
 - **部署与运维：** 阿里云 CentOS, Nginx, GitHub Actions 
 
 ## 核心难点与解决方案
@@ -44,7 +44,7 @@ npm install
 npm run dev
 ```
 ### 后端
-需配置 JDK 17 及 Maven 环境：
+需配置 JDK 25 及 Maven 环境：
 ```bash
 cd poker
 mvn clean package -DskipTests
