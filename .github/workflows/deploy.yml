@@ -16,7 +16,7 @@ jobs:
       - name: 🟢 配置 Node.js 环境
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
 
       - name: 📦 前端依赖安装与打包
         run: |
