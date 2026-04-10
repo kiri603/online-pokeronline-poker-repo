@@ -78,7 +78,11 @@ public class ScriptedAiService {
         }
 
         int currentTurns = estimateTurnsToFinish(hand, cache);
-        ScrollAction bestScroll = chooseBestScrollAction(room, bot, hand, freeTurn, bestNormal, cache);
+        // 同一回合已经用过锦囊时，后续决策必须退回普通牌逻辑，
+        // 否则五谷丰登等结算结束后会继续尝试打第二张锦囊，导致动作被后端拒绝。
+        ScrollAction bestScroll = bot.isHasUsedAoeThisTurn()
+                ? null
+                : chooseBestScrollAction(room, bot, hand, freeTurn, bestNormal, cache);
 
         if (!freeTurn && "GUSHOU".equals(bot.getSkill()) && !bot.isHasUsedSkillThisTurn()
                 && shouldUseGushou(room, bot, bestNormal, cache)) {
@@ -155,6 +159,22 @@ public class ScriptedAiService {
                 .sorted(Comparator.comparingInt(card -> discardCost(hand, card)))
                 .limit(Math.min(count, hand.size()))
                 .collect(Collectors.toList());
+    }
+
+    public List<Card> chooseEmergencyFreeTurnPlay(Player bot) {
+        List<Card> hand = safeHand(bot);
+        if (hand.isEmpty()) {
+            return List.of();
+        }
+
+        PlayCandidate fallback = chooseFallbackCandidate(
+                hand,
+                buildCandidates(hand).stream()
+                        .filter(candidate -> candidate.kind != PatternKind.SCROLL)
+                        .collect(Collectors.toList()),
+                new HashMap<>()
+        );
+        return fallback == null ? List.of() : new ArrayList<>(fallback.cards);
     }
 
     private boolean shouldUseGushou(GameRoom room, Player bot, PlayCandidate bestNormal, Map<String, Integer> cache) {

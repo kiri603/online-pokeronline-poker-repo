@@ -1,3 +1,4 @@
+import { computed } from "vue";
 import {
   showSettings,
   roomSettings,
@@ -12,6 +13,55 @@ import {
 } from "@/store/gameState.js";
 import { soundStatus, toggleSound, playBGM } from "@/store/audioManager.js";
 import { sendMsg, ws } from "@/store/gameSocket.js";
+
+const isOwner = computed(() => ownerId.value === userId.value);
+const isManager = computed(() => userId.value === "room_manager");
+
+const displayPlayers = computed(() => {
+  const players = [];
+
+  if (!isSpectator.value) {
+    players.push({
+      userId: userId.value,
+      isReady: isReady.value,
+      isBot: false,
+      isSelf: true,
+      orderSeed: -1,
+    });
+  }
+
+  otherPlayers.value.forEach((player, index) => {
+    players.push({
+      ...player,
+      isSelf: player.userId === userId.value,
+      orderSeed: index,
+    });
+  });
+
+  return players
+    .filter(
+      (player, index, allPlayers) =>
+        allPlayers.findIndex((candidate) => candidate.userId === player.userId) ===
+        index,
+    )
+    .sort((left, right) => {
+      const rank = (player) => {
+        if (player.userId === ownerId.value) return 0;
+        if (player.isSelf) return 1;
+        if (!player.isBot) return 2;
+        return 3;
+      };
+
+      return rank(left) - rank(right) || left.orderSeed - right.orderSeed;
+    });
+});
+
+const waitingActionsClass = computed(() => ({
+  "owner-actions": isOwner.value,
+  "player-actions": !isOwner.value && !isManager.value,
+  "manager-actions": isManager.value,
+}));
+
 const disbandRoom = () => {
   if (confirm("🚨 警告：确定要彻底从内存中抹除这个房间，并踢出所有人吗？")) {
     sendMsg("DISBAND_ROOM", null);
@@ -53,10 +103,14 @@ export {
   roomSettings,
   isClassicMode,
   ownerId,
+  isOwner,
+  isManager,
   userId,
   isReady,
   otherPlayers,
+  displayPlayers,
   allReady,
+  waitingActionsClass,
   handleScrollCardsChange,
   kickPlayer,
   startGame,

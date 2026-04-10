@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class ScriptedAiServiceTest {
 
@@ -58,6 +59,43 @@ class ScriptedAiServiceTest {
 
         assertEquals(ScriptedAiService.TurnDecisionType.PLAY, decision.getType());
         assertEquals(List.of(card("\u2660", "J", 9)), decision.getCards());
+    }
+
+    @Test
+    void botDoesNotAttemptSecondScrollAfterAlreadyUsingOneThisTurn() throws Exception {
+        ScriptedAiService service = createServiceWithRuleEngine();
+        GameRoom room = new GameRoom("room-3");
+
+        Player bot = new Player("bot", true);
+        Player other = new Player("other");
+        bot.setHasUsedAoeThisTurn(true);
+        bot.getHandCards().add(card("SCROLL", "NMRQ", 17));
+        bot.getHandCards().add(card("\u2660", "7", 5));
+
+        room.setPlayers(new ArrayList<>(List.of(bot, other)));
+        room.setCurrentTurnIndex(0);
+        room.setLastPlayedCards(new ArrayList<>());
+        room.setLastPlayPlayerId("");
+
+        ScriptedAiService.TurnDecision decision = service.decideTurn(room, bot);
+
+        assertNotEquals(ScriptedAiService.TurnDecisionType.USE_SKILL, decision.getType());
+        if (decision.getType() == ScriptedAiService.TurnDecisionType.PLAY) {
+            assertNotEquals("SCROLL", decision.getCards().get(0).getSuit());
+        }
+    }
+
+    @Test
+    void emergencyFreeTurnPlayIgnoresScrollCards() throws Exception {
+        ScriptedAiService service = createServiceWithRuleEngine();
+        Player bot = new Player("bot", true);
+        bot.getHandCards().add(card("SCROLL", "WGFD", 18));
+        bot.getHandCards().add(card("\u2663", "9", 7));
+        bot.getHandCards().add(card("\u2665", "9", 7));
+
+        List<Card> emergencyPlay = service.chooseEmergencyFreeTurnPlay(bot);
+
+        assertEquals(List.of(card("\u2663", "9", 7), card("\u2665", "9", 7)), emergencyPlay);
     }
 
     private ScriptedAiService createServiceWithRuleEngine() throws Exception {

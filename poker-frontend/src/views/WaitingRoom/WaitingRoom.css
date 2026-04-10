@@ -37,6 +37,54 @@
   margin: 40px 0;
   text-align: center;
 }
+.player-rows {
+  width: min(100%, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+.player-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: rgba(52, 73, 94, 0.92);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+.player-row.is-owner {
+  border: 1px solid rgba(241, 196, 15, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(241, 196, 15, 0.15),
+    0 8px 18px rgba(0, 0, 0, 0.22);
+}
+.player-row.is-me {
+  background: linear-gradient(135deg, #2980b9, #3498db);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.player-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.player-name {
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.player-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .player-tags {
   display: flex;
   gap: 15px;
@@ -57,14 +105,18 @@
 }
 .status-badge {
   font-size: 14px;
-  margin-left: 8px;
   color: #f1c40f;
+}
+.bot-badge {
+  color: #ffdf7d;
 }
 
 /* ====== 操作按钮区 ====== */
 .waiting-actions {
   display: flex;
   gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 .start-btn {
   padding: 12px 30px;
@@ -112,6 +164,10 @@
   font-size: 12px;
   margin-left: 10px;
   cursor: pointer;
+}
+.player-row .kick-btn {
+  margin-left: 0;
+  flex-shrink: 0;
 }
 .kick-btn:hover {
   background: #e74c3c;
@@ -242,6 +298,11 @@
     top: 15px;
     right: 15px;
   }
+  .waiting-room {
+    margin: 12px;
+    padding: 78px 14px 20px;
+    justify-content: flex-start;
+  }
   .settings-btn.small {
     font-size: 12px;
     padding: 6px 12px;
@@ -252,8 +313,120 @@
   }
   .art-subtitle {
     font-size: 32px;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
   }
   .please-ready-hint {
     font-size: 18px;
+  }
+  .players-list {
+    width: 100%;
+    margin: 26px 0 18px;
+  }
+  .players-list h3 {
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+  .player-rows {
+    width: min(100%, 320px);
+    gap: 8px;
+  }
+  .player-row {
+    padding: 8px 12px;
+    border-radius: 24px;
+    gap: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  }
+  .player-row-main {
+    gap: 8px;
+    align-items: center;
+  }
+  .player-name {
+    font-size: 15px;
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+  }
+  .player-badges {
+    gap: 6px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+  .status-badge {
+    font-size: 11px;
+    margin: 0;
+  }
+  .player-row .kick-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 8px;
+  }
+  .waiting-actions {
+    width: 100%;
+    max-width: 290px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .waiting-actions > button {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 9px 10px;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+  .waiting-actions.player-actions {
+    grid-template-columns: 1fr;
+    max-width: 190px;
+    justify-items: center;
+  }
+  .waiting-actions.player-actions > button {
+    max-width: 170px;
+  }
+  .waiting-actions.player-actions > .return-btn {
+    grid-column: auto;
+  }
+  .waiting-actions > .return-btn {
+    grid-column: 1 / -1;
+    max-width: 170px;
+    justify-self: center;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .waiting-room {
+    margin: 10px;
+    padding: 70px 10px 16px;
+  }
+  .art-subtitle {
+    font-size: 26px;
+  }
+  .players-list h3 {
+    font-size: 18px;
+  }
+  .player-rows {
+    width: min(100%, 304px);
+  }
+  .player-row {
+    padding: 7px 11px;
+  }
+  .player-name {
+    font-size: 14px;
+  }
+  .status-badge {
+    font-size: 10px;
+  }
+  .waiting-actions {
+    max-width: 270px;
+    gap: 8px;
+  }
+  .waiting-actions > button {
+    min-height: 40px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .waiting-actions > .return-btn {
+    max-width: 156px;
   }
 }

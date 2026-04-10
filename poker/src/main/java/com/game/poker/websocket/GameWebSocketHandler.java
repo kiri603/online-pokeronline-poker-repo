@@ -1112,6 +1112,56 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 && cards.stream().anyMatch(card -> "JOKER".equals(card.getSuit()) && "大王".equals(card.getRank()));
     }
 
+    private boolean tryEmergencyFreeTurnPlay(String roomId, com.game.poker.model.Player bot, String reason) throws Exception {
+        GameRoom room = gameService.getRoom(roomId);
+        if (room == null || room.getCurrentAoeType() != null || room.getPlayers().isEmpty()) {
+            return false;
+        }
+
+        int turnIndex = room.getCurrentTurnIndex();
+        if (turnIndex < 0 || turnIndex >= room.getPlayers().size()) {
+            return false;
+        }
+
+        com.game.poker.model.Player currentPlayer = room.getPlayers().get(turnIndex);
+        if (!currentPlayer.getUserId().equals(bot.getUserId())) {
+            return false;
+        }
+
+        boolean jdsrTarget = room.getSettings().containsKey("jdsr_target")
+                && bot.getUserId().equals(room.getSettings().get("jdsr_target"));
+        boolean freeTurn = room.getLastPlayedCards().isEmpty()
+                || (!jdsrTarget && bot.getUserId().equals(room.getLastPlayPlayerId()));
+        if (!freeTurn) {
+            return false;
+        }
+
+        List<Card> emergencyPlay = scriptedAiService.chooseEmergencyFreeTurnPlay(bot);
+        if (emergencyPlay.isEmpty()) {
+            return false;
+        }
+
+        log.warn("scripted bot [{}] uses emergency free-turn play after {} in room {}",
+                bot.getUserId(), reason, roomId);
+        if (!gameService.playCards(roomId, bot.getUserId(), emergencyPlay)) {
+            return false;
+        }
+
+        String cardsJson = objectMapper.writeValueAsString(emergencyPlay);
+        broadcastToRoom(roomId, new TextMessage(
+                "{\"event\": \"CARDS_PLAYED\", \"userId\": \"" + bot.getUserId() + "\", \"cards\": " + cardsJson + "}"
+        ));
+        syncPlayerHand(roomId, bot.getUserId());
+        publishWinnerIfNeeded(roomId, emergencyPlay);
+        broadcastGameState(roomId);
+
+        BotEmojiScenario emojiScenario = determineBotPlayEmojiScenario(emergencyPlay, bot);
+        if (emojiScenario != null) {
+            maybeSendBotEmoji(roomId, bot, emojiScenario);
+        }
+        return true;
+    }
+
     private void recoverBotAction(String roomId, com.game.poker.model.Player bot, String action, RuntimeException error) throws Exception {
         log.warn("scripted bot [{}] failed to {} in room {}: {}", bot.getUserId(), action, roomId, error.getMessage());
         fallbackBotAction(roomId, bot, action);
@@ -1197,11 +1247,15 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         boolean isAoe = playedCards.size() == 1 && "SCROLL".equals(playedCards.get(0).getSuit());
         try {
             if (!gameService.playCards(roomId, bot.getUserId(), playedCards)) {
-                fallbackBotAction(roomId, bot, "play cards");
+                if (!tryEmergencyFreeTurnPlay(roomId, bot, "rejected play")) {
+                    fallbackBotAction(roomId, bot, "play cards");
+                }
                 return;
             }
         } catch (RuntimeException e) {
-            recoverBotAction(roomId, bot, "play cards", e);
+            if (!tryEmergencyFreeTurnPlay(roomId, bot, e.getMessage())) {
+                recoverBotAction(roomId, bot, "play cards", e);
+            }
             return;
         }
 
@@ -1237,7 +1291,14 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 && !roomBefore.getLastPlayedCards().isEmpty()
                 && !bot.getUserId().equals(roomBefore.getLastPlayPlayerId());
 
-        gameService.passTurn(roomId, bot.getUserId());
+        try {
+            gameService.passTurn(roomId, bot.getUserId());
+        } catch (RuntimeException e) {
+            if (!tryEmergencyFreeTurnPlay(roomId, bot, e.getMessage())) {
+                recoverBotAction(roomId, bot, "pass", e);
+            }
+            return;
+        }
         GameRoom room = gameService.getRoom(roomId);
         if (room == null) {
             return;

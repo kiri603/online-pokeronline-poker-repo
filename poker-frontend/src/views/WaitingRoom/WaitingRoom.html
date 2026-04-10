@@ -79,31 +79,32 @@
   </div>
 
   <div class="players-list">
-    <h3>房间内玩家 ({{ otherPlayers.length + (isSpectator ? 0 : 1) }}/4)</h3>
-    <div class="player-tags">
-      <span class="tag me" v-if="!isSpectator">
-        {{ userId }} (你)
-        <span class="status-badge"
-          >{{ ownerId === userId ? "👑房主" : isReady ? "✅已准备" : "❌未准备"
-          }}</span
-        >
-      </span>
-
-      <span class="tag" v-for="p in otherPlayers" :key="p.userId">
-        {{ p.userId }}
-        <span v-if="p.isBot" class="status-badge">脚本AI</span>
-        <span class="status-badge"
-          >{{ ownerId === p.userId ? "👑房主" : p.isReady ? "✅已准备" :
-          "❌未准备" }}</span
-        >
+    <h3>房间内玩家 ({{ waitingRoomPlayers.length }}/4)</h3>
+    <div class="player-rows">
+      <div
+        class="player-row"
+        v-for="p in waitingRoomPlayers"
+        :key="p.userId"
+        :class="{ 'is-me': p.isSelf, 'is-owner': ownerId === p.userId }"
+      >
+        <div class="player-row-main">
+          <span class="player-name">{{ p.userId }}{{ p.isSelf ? " (你)" : "" }}</span>
+          <div class="player-badges">
+            <span v-if="p.isBot" class="status-badge bot-badge">脚本AI</span>
+            <span class="status-badge"
+              >{{ ownerId === p.userId ? "👑房主" : p.isReady ? "✅已准备" :
+              "❌未准备" }}</span
+            >
+          </div>
+        </div>
         <button
           class="kick-btn"
-          v-if="ownerId === userId || userId === 'room_manager'"
+          v-if="!p.isSelf && (isOwner || isManager)"
           @click="kickPlayer(p.userId)"
         >
           踢出
         </button>
-      </span>
+      </div>
     </div>
 
     <h3 v-if="spectators.length > 0" style="margin-top: 25px; color: #9b59b6">
@@ -132,8 +133,8 @@
     </div>
   </div>
 
-  <div class="waiting-actions">
-    <template v-if="userId === 'room_manager'">
+  <div class="waiting-actions" :class="waitingRoomActions">
+    <template v-if="waitingRoomIsManager">
       <button
         class="kick-btn"
         @click="disbandRoom"
@@ -148,20 +149,20 @@
       </button>
     </template>
 
-    <template v-else-if="ownerId === userId">
+    <template v-else-if="waitingRoomIsOwner">
       <button
         class="ready-btn"
         @click="addScriptAi"
-        :disabled="otherPlayers.length + 1 >= 4"
+        :disabled="waitingRoomPlayers.length >= 4"
       >
         添加脚本AI
       </button>
       <button
         class="start-btn"
         @click="startGame"
-        :disabled="otherPlayers.length === 0 || !allReady"
+        :disabled="waitingRoomPlayers.length < 2 || !allReady"
       >
-        {{ otherPlayers.length === 0 ? "需要至少2人" : !allReady ?
+        {{ waitingRoomPlayers.length < 2 ? "需要至少2人" : !allReady ?
         "等待其他玩家准备" : "开始游戏" }}
       </button>
     </template>
