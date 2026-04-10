@@ -12,3 +12,5 @@ poker/*.jar
 .vscode/
 *.iml
 .DS_Store
+
+stackedit-export/
