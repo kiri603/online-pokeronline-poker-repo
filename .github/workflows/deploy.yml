@@ -41,7 +41,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "poker-frontend/dist/*,poker/target/poker-0.0.1-SNAPSHOT.jar"
+          source: "poker-frontend/dist/*,poker/target/poker-0.0.1-SNAPSHOT.jar,poker/data/poker-auth.mv.db"
           target: "/tmp"
 
       - name: 🔄 远程执行替换与重启脚本
@@ -56,18 +56,21 @@ jobs:
             sleep 3
 
             echo "2. 备份旧版本..."
-            mkdir -p /root/backup/frontend /root/backup/backend
-            rm -rf /root/backup/frontend/* /root/backup/backend/*
+            mkdir -p /root/backup/frontend /root/backup/backend /root/backup/database
+            rm -rf /root/backup/frontend/* /root/backup/backend/* /root/backup/database/*
             mv /var/www/html/* /root/backup/frontend/ 2>/dev/null || true
             mv /poker/poker-0.0.1-SNAPSHOT.jar /root/backup/backend/ 2>/dev/null || true
+            mv /poker/data/poker-auth.mv.db /root/backup/database/ 2>/dev/null || true
 
             echo "3. 部署新版本..."
-            mkdir -p /var/www/html /poker
+            mkdir -p /var/www/html /poker /poker/data
             mv /tmp/poker-frontend/dist/* /var/www/html/
             mv /tmp/poker/target/poker-0.0.1-SNAPSHOT.jar /poker/
+            mv /tmp/poker/data/poker-auth.mv.db /poker/data/
 
             echo "4. 启动后端并重启 Nginx..."
             cd /poker
+            rm -f /poker/data/poker-auth.lock.db
             nohup java -jar poker-0.0.1-SNAPSHOT.jar > game.log 2>&1 &
             systemctl restart nginx
 

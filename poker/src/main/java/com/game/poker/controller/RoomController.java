@@ -2,8 +2,10 @@ package com.game.poker.controller;
 
 import com.game.poker.model.GameRoom;
 import com.game.poker.service.GameService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,37 +14,35 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/rooms")
-@CrossOrigin // 允许跨域请求
 public class RoomController {
+    private final GameService gameService;
 
-    @Autowired
-    private GameService gameService;
+    public RoomController(GameService gameService) {
+        this.gameService = gameService;
+    }
 
     @GetMapping
     public List<Map<String, Object>> getPublicRooms() {
-        List<Map<String, Object>> list = new ArrayList<>();
-        // 获取所有房间，过滤掉私密房间
+        List<Map<String, Object>> rooms = new ArrayList<>();
         for (GameRoom room : gameService.getAllRooms()) {
             if (!room.isPrivateRoom()) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("roomId", room.getRoomId());
-                map.put("playerCount", room.getPlayers().size());
-                map.put("status", room.isStarted() ? "PLAYING" : "WAITING");
-                list.add(map);
+                Map<String, Object> item = new HashMap<>();
+                item.put("roomId", room.getRoomId());
+                item.put("playerCount", room.getPlayers().size());
+                item.put("status", room.isStarted() ? "PLAYING" : "WAITING");
+                rooms.add(item);
             }
         }
-        return list;
+        return rooms;
     }
-    // ====== 【新增】：房间状态预检接口 ======
+
     @GetMapping("/check")
     public Map<String, Object> checkRoom(@RequestParam String roomId) {
-        com.game.poker.model.GameRoom room = gameService.getRoomMap().get(roomId);
+        GameRoom room = gameService.getRoomMap().get(roomId);
         Map<String, Object> response = new HashMap<>();
+        response.put("exists", room != null);
         if (room != null) {
-            response.put("exists", true);
             response.put("isPrivate", room.isPrivateRoom());
-        } else {
-            response.put("exists", false);
         }
         return response;
     }

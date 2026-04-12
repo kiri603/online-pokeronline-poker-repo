@@ -6,31 +6,90 @@
   height: 100%;
 }
 
-/* ====== 联机大厅双栏布局 ====== */
+.top-right-hud {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.account-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #eef5fb;
+  backdrop-filter: blur(8px);
+}
+
+.account-mini-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.account-mini-label {
+  font-size: 10px;
+  color: #c9d6e3;
+}
+
+.account-mini-name {
+  font-size: 12px;
+  font-weight: 700;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout-mini-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: white;
+  background: rgba(231, 76, 60, 0.86);
+  cursor: pointer;
+}
+
 .lobby-wrapper {
   display: flex;
   gap: 30px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(33, 52, 71, 0.78);
   padding: 40px;
-  border-radius: 12px;
-  max-width: 800px;
+  border-radius: 18px;
+  max-width: 840px;
   width: 90%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 36px rgba(20, 33, 47, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   z-index: 10;
 }
+
 .login-screen {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
+
 .login-screen input,
 .login-screen button {
   padding: 10px;
   font-size: 16px;
-  border-radius: 6px;
+  border-radius: 10px;
   border: none;
 }
+
+.login-screen input {
+  background: rgba(244, 248, 252, 0.95);
+}
+
 .login-screen button {
   background-color: #3498db;
   color: white;
@@ -38,11 +97,11 @@
   cursor: pointer;
   transition: background 0.2s;
 }
+
 .login-screen button:hover {
   background-color: #2980b9;
 }
 
-/* 联机大厅艺术字 */
 .art-title {
   color: #f5f2f2;
   font-size: 48px;
@@ -59,28 +118,15 @@
     0 0 40px #3498db;
 }
 
-.private-checkbox {
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  color: #f1c40f;
-  margin-top: 10px;
-}
-.private-checkbox input {
-  margin-right: 8px;
-  width: 18px;
-  height: 18px;
-}
-
-/* 房间滑动列表 */
 .room-list-panel {
   width: 300px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 15px;
   display: flex;
   flex-direction: column;
 }
+
 .room-list-panel h3 {
   margin-top: 0;
   text-align: center;
@@ -88,43 +134,49 @@
   padding-bottom: 10px;
   color: white;
 }
+
 .empty-rooms {
   text-align: center;
   color: #bdc3c7;
   margin-top: 50px;
 }
+
 .room-item {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(18, 30, 43, 0.32);
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   margin-bottom: 10px;
   cursor: pointer;
   transition: all 0.2s;
   color: white;
 }
+
 .room-item:hover {
   background: rgba(52, 152, 219, 0.5);
   transform: translateY(-2px);
 }
+
 .room-info {
   font-size: 16px;
   margin-bottom: 5px;
 }
+
 .room-stats {
   display: flex;
   justify-content: space-between;
   font-size: 14px;
 }
+
 .room-status.playing {
   color: #e74c3c;
   font-weight: bold;
 }
+
 .room-status.waiting {
   color: #2ecc71;
   font-weight: bold;
 }
 
-/* ====== 按钮与弹窗公共样式 ====== */
 .rule-toggle-btn {
   position: absolute;
   top: 20px;
@@ -141,6 +193,7 @@
   transition: all 0.2s;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
+
 .rule-toggle-btn:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
@@ -162,25 +215,23 @@
   transition: all 0.2s;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
+
 .update-toggle-btn:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
 }
 
-/* 弹窗内容 */
 .rules-modal {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  inset: 0;
+  background: rgba(21, 34, 49, 0.62);
   backdrop-filter: blur(4px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 999;
 }
+
 .rules-content {
   background: linear-gradient(135deg, #2c3e50, #34495e);
   padding: 30px 40px;
@@ -192,6 +243,7 @@
   border: 1px solid #7f8c8d;
   animation: popModal 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
+
 .rules-content h2 {
   margin-top: 0;
   text-align: center;
@@ -199,37 +251,23 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding-bottom: 15px;
 }
+
 .rules-content ul {
   line-height: 1.8;
   padding-left: 20px;
   font-size: 16px;
 }
+
 .rules-content li {
   margin-bottom: 12px;
 }
+
 .rules-content strong {
   color: #e74c3c;
 }
-.close-rule-btn {
-  display: block;
-  width: 100%;
-  margin-top: 25px;
-  padding: 12px;
-  background: #27ae60;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 18px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.close-rule-btn:hover {
-  background: #2ecc71;
-}
-/* ====== 规则弹窗底部按钮组 ====== */
 
 .close-rule-btn,
-.detail-rule-btn {
+.secondary-btn {
   flex: 1;
   padding: 12px;
   border: none;
@@ -238,43 +276,39 @@
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s;
+  box-sizing: border-box;
 }
+
 .close-rule-btn {
   background: #27ae60;
   color: white;
 }
+
 .close-rule-btn:hover {
   background: #2ecc71;
 }
 
-.detail-rule-btn:hover {
-  background: rgba(52, 152, 219, 0.1);
-  transform: translateY(-2px);
+.secondary-btn {
+  color: white;
 }
-.close-rule-btn {
-  display: block;
-  width: 100%;
+
+.rules-actions {
   margin-top: 25px;
-  padding: 12px;
-  background: #27ae60;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 18px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.close-rule-btn:hover {
-  background: #2ecc71;
+  display: flex;
+  gap: 12px;
 }
 
-/* 右下角对齐容器 */
+.rules-actions > button {
+  flex: 1;
+  width: auto;
+  margin-top: 0;
+}
+
 .detail-link-wrapper {
   text-align: right;
   margin-top: 15px;
 }
 
-/* 白字 + 下划线 超链接 */
 .detail-rule-link {
   color: #ffffff;
   text-decoration: underline;
@@ -283,9 +317,47 @@
   transition: opacity 0.2s;
   letter-spacing: 1px;
 }
+
 .detail-rule-link:hover {
   opacity: 0.7;
-  color: #f1c40f; /* 鼠标悬停时微微泛黄，增加反馈感 */
+  color: #f1c40f;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-list.mini {
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-list.mini .setting-item {
+  width: max-content;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 0 auto;
+  transform: translateX(-14px);
+}
+
+.settings-list.mini .setting-item span {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.settings-list.mini .setting-item input[type="checkbox"] {
+  margin: 0;
+  flex-shrink: 0;
 }
 
 @keyframes popModal {
@@ -298,11 +370,8 @@
     opacity: 1;
   }
 }
-/* ====== 全局声音控制悬浮按钮 (右上角) ====== */
+
 .global-sound-btn {
-  position: absolute;
-  top: 20px;
-  right: 20px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -314,81 +383,111 @@
   align-items: center;
   cursor: pointer;
   transition: all 0.2s;
-  z-index: 1000;
   padding: 0;
+  flex-shrink: 0;
 }
+
 .global-sound-btn:hover {
   background: rgba(255, 255, 255, 0.4);
   transform: scale(1.1);
 }
+
 .global-sound-btn.is-muted {
   background: rgba(231, 76, 60, 0.3);
   border-color: #e74c3c;
   color: #e74c3c;
 }
 
-/* 手机端稍微改小一点 */
 @media screen and (max-width: 768px) {
-  .global-sound-btn {
+  .top-right-hud {
     top: 10px;
     right: 10px;
+    gap: 8px;
+  }
+
+  .account-mini {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+
+  .account-mini-name {
+    max-width: 68px;
+    font-size: 11px;
+  }
+
+  .logout-mini-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .global-sound-btn {
     width: 32px;
     height: 32px;
   }
+
   .global-sound-btn svg {
     width: 16px !important;
     height: 16px !important;
   }
-}
-/* ====== 手机端适配 ====== */
-@media screen and (max-width: 768px) {
+
   .lobby-wrapper {
     flex-direction: column;
     padding: 20px;
     margin-top: 60px;
   }
+
   .room-list-panel {
     width: 92%;
     height: 250px;
     overflow-y: auto;
   }
+
   .rule-toggle-btn {
     top: 10px;
     left: 10px;
     padding: 6px 12px;
     font-size: 13px;
   }
+
   .update-toggle-btn {
     top: 50px;
     left: 10px;
     padding: 6px 12px;
     font-size: 13px;
   }
+
   .art-title {
     font-size: 36px;
     letter-spacing: 4px;
   }
+
   .rules-content {
     padding: 20px;
     font-size: 14px;
-    max-height: 80vh; /* 限制弹窗整体最大高度占屏幕 80% */
+    max-height: 80vh;
     display: flex;
     flex-direction: column;
   }
+
   .rules-content h2 {
     font-size: 20px;
     margin-bottom: 10px;
   }
+
   .rules-content ul {
     max-height: 40vh !important;
     overflow-y: auto;
-    padding-right: 5px; /* 给滚动条留点空间 */
+    padding-right: 5px;
     margin-bottom: 10px;
   }
 
-  .close-rule-btn {
-    margin-top: 10px;
+  .close-rule-btn,
+  .secondary-btn {
     padding: 10px;
     font-size: 16px;
+  }
+
+  .settings-list.mini .setting-item {
+    transform: translateX(-8px);
   }
 }

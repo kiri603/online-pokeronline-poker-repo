@@ -1,0 +1,60 @@
+<div class="auth-shell">
+  <div v-if="!authChecked" class="auth-card auth-loading">
+    <h2 class="auth-loading-title">正在恢复登录</h2>
+    <p>请稍候，系统正在识别这个设备上次使用的账号。</p>
+  </div>
+
+  <div v-else class="auth-card">
+    <h1 class="auth-title">三国斗地主</h1>
+
+    <div class="auth-tabs">
+      <button
+        :class="['auth-tab', { active: authMode === 'login' }]"
+        @click="switchAuthMode('login')"
+      >
+        登录
+      </button>
+      <button
+        :class="['auth-tab', { active: authMode === 'register' }]"
+        @click="switchAuthMode('register')"
+      >
+        注册
+      </button>
+    </div>
+
+    <input v-model.trim="authUsername" maxlength="20" placeholder="用户名（4-20位）" />
+    <input
+      v-model="authPassword"
+      type="password"
+      maxlength="64"
+      placeholder="密码（至少8位，需含字母和数字）"
+    />
+
+    <div class="captcha-row">
+      <input
+        v-model.trim="authCaptchaCode"
+        maxlength="8"
+        placeholder="请输入验证码"
+        @keyup.enter="submitAuth"
+      />
+      <img
+        v-if="authCaptchaImage"
+        :src="authCaptchaImage"
+        alt="captcha"
+        class="captcha-image"
+        @click="refreshCaptcha"
+      />
+    </div>
+
+    <p v-if="authError" class="auth-message error">{{ authError }}</p>
+    <p v-if="authSuccess" class="auth-message success">{{ authSuccess }}</p>
+
+    <button class="submit-btn" :disabled="authLoading" @click="submitAuth">
+      {{ authLoading ? '提交中...' : authMode === 'register' ? '注册并进入大厅' : '登录进入大厅' }}
+    </button>
+
+    <button class="guest-btn" :disabled="authLoading" @click="submitGuestLogin">
+      游客登录
+    </button>
+  </div>
+</div>

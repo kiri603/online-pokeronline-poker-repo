@@ -1,16 +1,21 @@
-<button
-  class="global-sound-btn"
-  @click="toggleSound"
-  :class="{ 'is-muted': !soundStatus }"
->
-  <svg class="icon" aria-hidden="true" style="font-size: 20px">
-    <use
-      :xlink:href="soundStatus ? '#icon-soundsize' : '#icon-mute-copy'"
-    ></use>
-  </svg>
-</button>
+<div class="top-right-hud">
+  <button
+    class="global-sound-btn"
+    @click="toggleSound"
+    :class="{ 'is-muted': !soundStatus }"
+  >
+    <svg class="icon" aria-hidden="true" style="font-size: 20px">
+      <use
+        :xlink:href="soundStatus ? '#icon-soundsize' : '#icon-mute-copy'"
+      ></use>
+    </svg>
+  </button>
+</div>
+
 <div class="lobby-view-container">
-  <button class="rule-toggle-btn" @click="showRules = true">📜 游戏规则</button>
+  <button class="rule-toggle-btn" @click="showRules = true">📐 游戏规则</button>
+  <button class="update-toggle-btn" @click="showUpdates = true">📙 更新公告</button>
+
   <div v-if="showRules" class="rules-modal" @click="showRules = false">
     <div class="rules-content" @click.stop>
       <h2>核心规则玩法</h2>
@@ -20,13 +25,12 @@
           张手牌，由系统随机指定一名玩家先出，随后顺时针轮流。牌型大小依据经典“斗地主”规则。
         </li>
         <li>
-          <strong>技能【制衡】：</strong>在你的出牌回合，你可以选择“制衡”（弃置
-          1 张手牌，并重新摸 1 张），每回合限用 1 次。
+          <strong>技能【制衡】：</strong>在你的出牌回合，你可以选择“制衡”（弃置 1
+          张手牌，并重新摸 1 张），每回合限用 1 次。
         </li>
         <li>
-          <strong>过牌惩罚：</strong
-          >如果没有牌大过上家，或者主动选择“要不起”，将被惩罚<strong
-            >需要摸 2 张牌</strong
+          <strong>过牌惩罚：</strong>如果没有牌大过上家，或者主动选择“要不起”，将被惩罚<strong>需要摸
+            2 张牌</strong
           >。
         </li>
         <li>
@@ -45,29 +49,21 @@
     </div>
   </div>
 
-  <button class="update-toggle-btn" @click="showUpdates = true">
-    📢 更新公告
-  </button>
   <div v-if="showUpdates" class="rules-modal" @click="showUpdates = false">
     <div class="rules-content" @click.stop>
       <h2>最新更新内容</h2>
       <ul>
         <li>
-          <strong>📜 锦囊牌模式：</strong><br />
-          新增锦囊卡【南蛮入侵】、【万箭齐发】、【五谷丰登】、【借刀杀人】,可在房间设置中启用！
+          <strong>🤖 增加AI玩家：</strong><br />
+          现在支持脚本 AI 玩家自动进房、自动选技能、自动出牌、自动发表情与自动准备。
         </li>
         <li>
-          <strong>平衡调整：</strong
-          ><br />锦囊模式下，【南蛮入侵】与【万箭齐发】削减为全场各 1 张。
+          <strong>👤 账号系统：</strong><br />
+          新增注册登录、设备记住登录，以及游客登录功能。
         </li>
         <li>
-          <strong>⚔️ 技能模式：</strong><br />
-          新增技能【乱箭】、【观星】、【固守】,可在房间设置中启用！
-        </li>
-        <li>
-          <strong>✨ 体验升级：</strong><br />
-          增加了音效功能;<br />
-          优化了手机端的洗牌动画;
+          <strong>📐 锦囊与技能模式：</strong><br />
+          锦囊牌、武将技能仍可在创建房间时自由组合启用。
         </li>
         <li>
           <strong>bug修复:</strong><br />
@@ -81,7 +77,7 @@
             color: #bdc3c7;
           "
         >
-          💡 游戏Bug反馈以及建议途径<br />
+          📕 游戏Bug反馈以及建议途径<br />
           游戏测试交流群 QQ：1082246463
         </li>
       </ul>
@@ -97,26 +93,26 @@
     @click="showCreateModal = false"
   >
     <div class="rules-content" style="max-width: 400px" @click.stop>
-      <h2 style="color: #2ecc71">⚙️ 创建房间: {{ roomId }}</h2>
+      <h2 style="color: #2ecc71">🎙️ 创建房间: {{ roomId }}</h2>
 
       <div class="settings-list mini" style="margin-top: 20px">
         <label class="setting-item">
-          <span>🀄 经典场 (默认规则)</span>
-          <input type="checkbox" checked disabled /><br />
+          <span>🎴 经典场(默认规则)</span>
+          <input type="checkbox" checked disabled />
         </label>
         <label class="setting-item">
-          <span>📜 启用锦囊牌</span>
+          <span>📐 启用锦囊牌</span>
           <input
             type="checkbox"
             v-model="roomSettings.enableScrollCards"
-          /><br />
+          />
         </label>
         <label class="setting-item">
-          <span>⚔️ 启用武将技能</span>
-          <input type="checkbox" v-model="roomSettings.enableSkills" /><br />
+          <span>🗡️ 启用武将技能</span>
+          <input type="checkbox" v-model="roomSettings.enableSkills" />
         </label>
         <label class="setting-item">
-          <span>🔒 设为私密房间</span>
+          <span>🔐 设为私密房间</span>
           <input type="checkbox" v-model="isPrivate" />
         </label>
 
@@ -142,15 +138,15 @@
         style="margin-top: 30px; display: flex; gap: 15px"
       >
         <button
-          class="close-rule-btn"
-          style="background: #95a5a6; margin-top: 0; flex: 1"
+          class="secondary-btn"
+          style="background: #95a5a6"
           @click="showCreateModal = false"
         >
           取消
         </button>
         <button
           class="close-rule-btn"
-          style="background: #27ae60; margin-top: 0; flex: 1"
+          style="background: #27ae60"
           @click="confirmCreateRoom"
         >
           确认创建
@@ -163,11 +159,6 @@
     <div class="login-screen">
       <h1 class="art-title">联机大厅</h1>
       <input v-model="roomId" placeholder="请输入房间号 (如 101)" />
-      <input
-        v-model="userId"
-        placeholder="请输入你的昵称"
-        @keyup.enter="handleJoinClick"
-      />
       <button @click="handleJoinClick">加入 / 创建房间</button>
     </div>
 
@@ -185,7 +176,7 @@
       >
         <div class="room-info">房间号: <strong>{{ room.roomId }}</strong></div>
         <div class="room-stats">
-          <span>👫 {{ room.playerCount }}/4</span>
+          <span>👌 {{ room.playerCount }}/4</span>
           <span
             :class="['room-status', room.status === 'PLAYING' ? 'playing' : 'waiting']"
           >

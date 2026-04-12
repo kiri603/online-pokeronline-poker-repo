@@ -12,6 +12,14 @@ import {
   isReady,
   otherPlayers,
   displayPlayers,
+  canUseSocial,
+  canQuickAddFriend as canQuickAddFriendImpl,
+  isFriendPlayer as isFriendPlayerImpl,
+  quickAddFriend as quickAddFriendImpl,
+  socialDrawerOpen,
+  waitingRoomFriendList,
+  toggleWaitingFriendDrawer,
+  inviteFriendToRoom,
   allReady,
   waitingActionsClass,
   handleScrollCardsChange,
@@ -32,6 +40,9 @@ const waitingRoomIsOwner = isOwner;
 const waitingRoomIsManager = isManager;
 const waitingRoomPlayers = displayPlayers;
 const waitingRoomActions = waitingActionsClass;
+const canQuickAddFriend = canQuickAddFriendImpl;
+const isFriendPlayer = isFriendPlayerImpl;
+const quickAddFriend = quickAddFriendImpl;
 
 // ====== 【核心防白屏机制】：强制暴露变量，防 Vite 误删 ======
 const _exposeToHtml = {
@@ -47,6 +58,14 @@ const _exposeToHtml = {
   isReady,
   otherPlayers,
   displayPlayers,
+  canUseSocial,
+  canQuickAddFriend,
+  isFriendPlayer,
+  quickAddFriend,
+  socialDrawerOpen,
+  waitingRoomFriendList,
+  toggleWaitingFriendDrawer,
+  inviteFriendToRoom,
   waitingRoomPlayers,
   allReady,
   waitingActionsClass,

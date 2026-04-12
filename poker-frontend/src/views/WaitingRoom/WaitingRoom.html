@@ -71,6 +71,33 @@
         （仅房主可修改设置）
       </p>
     </div>
+
+    <button
+      v-if="canUseSocial"
+      class="friend-toggle-btn"
+      @click="toggleWaitingFriendDrawer"
+    >
+      {{ socialDrawerOpen ? "收起好友" : "好友邀请" }}
+    </button>
+
+    <div v-if="canUseSocial && socialDrawerOpen" class="friend-drawer">
+      <div class="friend-drawer-title">在线好友</div>
+      <div v-if="waitingRoomFriendList.length === 0" class="friend-drawer-empty">
+        暂时没有在线好友可以邀请
+      </div>
+      <div v-else class="friend-drawer-list">
+        <div
+          v-for="friend in waitingRoomFriendList"
+          :key="friend.userId"
+          class="friend-drawer-item"
+        >
+          <span>{{ friend.userId }}</span>
+          <button class="friend-invite-btn" @click="inviteFriendToRoom(friend.userId)">
+            邀请
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <h2 class="art-subtitle">等待大厅</h2>
@@ -90,20 +117,32 @@
         <div class="player-row-main">
           <span class="player-name">{{ p.userId }}{{ p.isSelf ? " (你)" : "" }}</span>
           <div class="player-badges">
-            <span v-if="p.isBot" class="status-badge bot-badge">脚本AI</span>
-            <span class="status-badge"
-              >{{ ownerId === p.userId ? "👑房主" : p.isReady ? "✅已准备" :
-              "❌未准备" }}</span
+            <span v-if="isFriendPlayer(p)" class="status-badge friend-badge">好友</span>
+            <span v-if="ownerId === p.userId" class="status-badge owner-badge">👑房主</span>
+            <span
+              class="status-badge ready-badge"
+              :class="ownerId === p.userId || p.isReady ? 'is-ready' : 'is-not-ready'"
             >
+              {{ ownerId === p.userId || p.isReady ? "已准备" : "未准备" }}
+            </span>
           </div>
         </div>
-        <button
-          class="kick-btn"
-          v-if="!p.isSelf && (isOwner || isManager)"
-          @click="kickPlayer(p.userId)"
-        >
-          踢出
-        </button>
+        <div class="player-row-actions">
+          <button
+            v-if="canQuickAddFriend(p)"
+            class="add-friend-btn"
+            @click="quickAddFriend(p)"
+          >
+            加好友
+          </button>
+          <button
+            class="kick-btn"
+            v-if="!p.isSelf && (isOwner || isManager)"
+            @click="kickPlayer(p.userId)"
+          >
+            踢出
+          </button>
+        </div>
       </div>
     </div>
 

@@ -1,11 +1,15 @@
 package com.game.poker.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.game.poker.auth.AuthSessionKeys;
+import com.game.poker.auth.SessionUser;
 import com.game.poker.model.Card;
 import com.game.poker.model.GameMessage;
 import com.game.poker.model.GameRoom;
+import com.game.poker.service.GameRecordService;
 import com.game.poker.service.GameService;
 import com.game.poker.service.ScriptedAiService;
+import com.game.poker.service.UserService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +66,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     @Autowired
     private ScriptedAiService scriptedAiService;
 
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private GameRecordService gameRecordService;
+
     // JSON 转换工具
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -77,7 +87,14 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
+        SessionUser sessionUser = getAuthenticatedUser(session);
+        log.info("websocket connected: sessionId={}, user={}",
+                session.getId(),
+                sessionUser == null ? "anonymous" : sessionUser.getUsername());
         log.info("新的 WebSocket 连接建立: {}", session.getId());
+        if (sessionUser != null && !isSessionCurrent(sessionUser)) {
+            forceLogoutSession(session, "账号已在其他设备登录，请重新登录");
+        }
     }
 
     @PreDestroy
@@ -100,10 +117,26 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             // 直接 return 结束本次处理。由于异常被捕获且没有向外抛出，WebSocket 连接将保持畅通
             return;
         }
+        SessionUser sessionUser = getAuthenticatedUser(session);
+        if (sessionUser == null) {
+            if (session.isOpen()) {
+                session.sendMessage(new TextMessage("{\"event\": \"ERROR\", \"msg\": \"未登录或登录已过期，请重新登录\"}"));
+                session.close(CloseStatus.POLICY_VIOLATION);
+            }
+            return;
+        }
+        if (!isSessionCurrent(sessionUser)) {
+            forceLogoutSession(session, "账号已在其他设备登录，请重新登录");
+            return;
+        }
+
         String roomId = gameMsg.getRoomId();
-        String userId = gameMsg.getUserId();
+        String userId = sessionUser.getUsername();
         String type = gameMsg.getType();
 
+        if (gameMsg.getUserId() != null && !gameMsg.getUserId().equals(userId)) {
+            log.warn("websocket payload user spoof attempt: payload={}, session={}", gameMsg.getUserId(), userId);
+        }
         sessionUserMap.put(session.getId(), userId);
 
         try {
@@ -238,16 +271,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                         syncPlayerHand(roomId, userId);
 
                         // ====== 【核心修复】：补上遗漏的游戏结束广播 ======
-                        com.game.poker.model.Player gushouDiscardWinner = gameService.getRoom(roomId).getPlayers().stream()
-                                .filter(p -> "WON".equals(p.getStatus())).findFirst().orElse(null);
-                        if (gushouDiscardWinner != null) {
-                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + gushouDiscardWinner.getUserId() + "\", \"winningCards\": []}"));
-                            GameRoom endRoom = gameService.getRoom(roomId);
-                            if (endRoom != null) {
-                                endRoom.setStarted(false); // 解锁准备按钮
-                                endRoom.getPlayers().forEach(player -> player.setReady(false)); // 强行把所有人打回未准备状态
-                            }
-                        }
+                        publishWinnerIfNeeded(roomId, List.of());
 
                         broadcastGameState(roomId);
                     } catch (Exception e) {
@@ -262,16 +286,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                         syncPlayerHand(roomId, userId);
                         broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + userId + "\", \"skillName\": \"GUSHOU\"}"));
                         // ====== 【核心修复】：补上遗漏的游戏结束广播 ======
-                        com.game.poker.model.Player gushouWinner = gameService.getRoom(roomId).getPlayers().stream()
-                                .filter(p -> "WON".equals(p.getStatus())).findFirst().orElse(null);
-                        if (gushouWinner != null) {
-                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + gushouWinner.getUserId() + "\", \"winningCards\": []}"));
-                            GameRoom endRoom = gameService.getRoom(roomId);
-                            if (endRoom != null) {
-                                endRoom.setStarted(false); // 解锁准备按钮
-                                endRoom.getPlayers().forEach(player -> player.setReady(false)); // 强行把所有人打回未准备状态
-                            }
-                        }
+                        publishWinnerIfNeeded(roomId, List.of());
 
                         broadcastGameState(roomId);
                     } catch (Exception e) {
@@ -318,14 +333,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                                 sendToUser(roomId, userId, new TextMessage("{\"event\": \"SYNC_HAND\", \"cards\": " + handJson + "}"));
                             }
                             if (p != null && "WON".equals(p.getStatus())) {
-                                // 如果凭借最后一张锦囊赢了，底牌就下发一个空数组
-                                String winCardsJson = objectMapper.writeValueAsString(isAoe ? new ArrayList<>() : playedCards);
-                                broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + userId + "\", \"winningCards\": " + winCardsJson + "}"));
-                                GameRoom endRoom = gameService.getRoom(roomId);
-                                if (endRoom != null) {
-                                    endRoom.setStarted(false); // 解锁准备按钮
-                                    endRoom.getPlayers().forEach(player -> player.setReady(false)); // 强行把所有人打回未准备状态
-                                }
+                                publishWinnerIfNeeded(roomId, isAoe ? List.of() : playedCards);
                             }
                         } else {
                             session.sendMessage(new TextMessage("{\"event\": \"ERROR\", \"msg\": \"出牌不符合规则或未大过上一手\"}"));
@@ -360,16 +368,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                         if (gameService.getRoom(roomId).getLastPlayedCards().isEmpty()) {
                             broadcastToRoom(roomId, new TextMessage("{\"event\": \"ROUND_RESET\"}"));
                         }
-                        com.game.poker.model.Player winner = gameService.getRoom(roomId).getPlayers().stream()
-                                .filter(p -> "WON".equals(p.getStatus())).findFirst().orElse(null);
-                        if (winner != null) {
-                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + winner.getUserId() + "\", \"winningCards\": []}"));
-                            GameRoom endRoom = gameService.getRoom(roomId);
-                            if (endRoom != null) {
-                                endRoom.setStarted(false); // 解锁准备按钮
-                                endRoom.getPlayers().forEach(player -> player.setReady(false)); // 强行把所有人打回未准备状态
-                            }
-                        }
+                        publishWinnerIfNeeded(roomId, List.of());
                     } catch (Exception e) {
                         // 如果违反规则（比如自由出牌回合强行不出），给该玩家弹窗报错
                         session.sendMessage(new TextMessage("{\"event\": \"ERROR\", \"msg\": \"" + e.getMessage() + "\"}"));
@@ -496,12 +495,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
                         // 检查拿完牌后有没有人爆仓直接结束游戏
                         GameRoom rAfter = gameService.getRoom(roomId);
-                        com.game.poker.model.Player wgfdWinner = rAfter.getPlayers().stream().filter(p -> "WON".equals(p.getStatus())).findFirst().orElse(null);
-                        if (wgfdWinner != null) {
-                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + wgfdWinner.getUserId() + "\", \"winningCards\": []}"));
-                            rAfter.setStarted(false);
-                            rAfter.getPlayers().forEach(player -> player.setReady(false));
-                        }
+                        publishWinnerIfNeeded(roomId, List.of());
                         broadcastGameState(roomId);
                     } catch (Exception e) {
                         session.sendMessage(new TextMessage("{\"event\": \"ERROR\", \"msg\": \"" + e.getMessage() + "\"}"));
@@ -521,12 +515,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                         if (roomAfter.getLastPlayedCards().isEmpty() && roomAfter.getCurrentAoeType() == null) {
                             broadcastToRoom(roomId, new TextMessage("{\"event\": \"ROUND_RESET\"}"));
                         }
-                        com.game.poker.model.Player pWinner = roomAfter.getPlayers().stream().filter(p -> "WON".equals(p.getStatus())).findFirst().orElse(null);
-                        if (pWinner != null) {
-                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + pWinner.getUserId() + "\", \"winningCards\": []}"));
-                            roomAfter.setStarted(false);
-                            roomAfter.getPlayers().forEach(player -> player.setReady(false));
-                        }
+                        publishWinnerIfNeeded(roomId, List.of());
                         broadcastGameState(roomId);
                     } catch (Exception e) {
                         session.sendMessage(new TextMessage("{\"event\": \"ERROR\", \"msg\": \"" + e.getMessage() + "\"}"));
@@ -564,16 +553,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                         // 刷新自己手牌
                         syncPlayerHand(roomId, userId);
                         // 检测是否有人因为爆仓产生赢家
-                        com.game.poker.model.Player aoeWinner = gameService.getRoom(roomId).getPlayers().stream()
-                                .filter(p -> "WON".equals(p.getStatus())).findFirst().orElse(null);
-                        if (aoeWinner != null) {
-                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + aoeWinner.getUserId() + "\", \"winningCards\": []}"));
-                            GameRoom endRoom = gameService.getRoom(roomId);
-                            if (endRoom != null) {
-                                endRoom.setStarted(false); // 解锁准备按钮
-                                endRoom.getPlayers().forEach(player -> player.setReady(false)); // 强行把所有人打回未准备状态
-                            }
-                        }
+                        publishWinnerIfNeeded(roomId, List.of());
                         broadcastGameState(roomId);
 
                     } catch (Exception e) {
@@ -644,6 +624,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                                 com.game.poker.model.Player winner = room.getPlayers().stream()
                                         .filter(player -> "WON".equals(player.getStatus())).findFirst().orElse(null);
                                 if (winner != null) {
+                                    gameRecordService.recordCompletedGame(room);
                                     broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + winner.getUserId() + "\", \"winningCards\": []}"));
                                     GameRoom endRoom = gameService.getRoom(roomId);
                                     if (endRoom != null) {
@@ -671,6 +652,23 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     // --- 广播辅助方法 ---
     private void addSessionToRoom(String roomId, WebSocketSession session) {
         roomSessions.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>()).add(session);
+    }
+
+    public void forceLogoutUser(String userId, String reason) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        List<WebSocketSession> targetSessions = new ArrayList<>();
+        for (CopyOnWriteArraySet<WebSocketSession> sessions : roomSessions.values()) {
+            for (WebSocketSession session : sessions) {
+                if (userId.equals(sessionUserMap.get(session.getId())) && session.isOpen()) {
+                    targetSessions.add(session);
+                }
+            }
+        }
+        for (WebSocketSession targetSession : targetSessions) {
+            forceLogoutSession(targetSession, reason);
+        }
     }
 
     private void broadcastToRoom(String roomId, TextMessage message) throws Exception {
@@ -1446,10 +1444,36 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         broadcastToRoom(roomId, new TextMessage("{\"event\": \"GAME_OVER\", \"winner\": \"" + winner.getUserId() + "\", \"winningCards\": " + winningCardsJson + "}"));
         room.setStarted(false);
         room.getPlayers().forEach(player -> player.setReady(player.isBot()));
+        gameRecordService.recordCompletedGame(room);
         if (winner.isBot()) {
             maybeSendBotEmoji(roomId, winner, BotEmojiScenario.VICTORY);
         }
         return true;
+    }
+
+    private boolean isSessionCurrent(SessionUser sessionUser) {
+        return userService.isSessionVersionCurrent(sessionUser);
+    }
+
+    private void forceLogoutSession(WebSocketSession session, String reason) {
+        if (session == null || !session.isOpen()) {
+            return;
+        }
+        try {
+            session.sendMessage(new TextMessage("{\"event\": \"FORCE_LOGOUT\", \"msg\": \"" + reason + "\"}"));
+        } catch (Exception e) {
+            log.warn("failed to push force logout message to session {}", session.getId(), e);
+        }
+        try {
+            session.close(CloseStatus.POLICY_VIOLATION);
+        } catch (Exception e) {
+            log.warn("failed to close websocket session {} during force logout", session.getId(), e);
+        }
+    }
+
+    private SessionUser getAuthenticatedUser(WebSocketSession session) {
+        Object rawUser = session.getAttributes().get(AuthSessionKeys.LOGIN_USER);
+        return rawUser instanceof SessionUser sessionUser ? sessionUser : null;
     }
 
     private void syncAllHands(String roomId) throws Exception {

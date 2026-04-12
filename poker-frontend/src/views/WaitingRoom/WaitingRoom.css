@@ -83,7 +83,14 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.player-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .player-tags {
   display: flex;
@@ -104,11 +111,41 @@
   border: 2px solid #3498db;
 }
 .status-badge {
-  font-size: 14px;
-  color: #f1c40f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #dbe7f3;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
 }
 .bot-badge {
   color: #ffdf7d;
+  background: rgba(255, 223, 125, 0.1);
+  border-color: rgba(255, 223, 125, 0.28);
+}
+.friend-badge {
+  color: #77f3b2;
+  background: rgba(119, 243, 178, 0.12);
+  border-color: rgba(119, 243, 178, 0.34);
+}
+.owner-badge {
+  color: #f1c40f;
+  background: rgba(241, 196, 15, 0.12);
+  border-color: rgba(241, 196, 15, 0.34);
+}
+.ready-badge.is-ready {
+  color: #77f3b2;
+}
+.ready-badge.is-not-ready {
+  color: #ff8f8f;
+}
+.ready-badge {
+  margin-left: auto;
 }
 
 /* ====== 操作按钮区 ====== */
@@ -146,6 +183,17 @@
 .ready-btn.is-ready {
   background-color: #27ae60;
 }
+.friend-toggle-btn {
+  margin-top: 10px;
+  padding: 8px 15px;
+  font-size: 14px;
+  background: rgba(52, 124, 214, 0.9);
+  border-radius: 20px;
+  color: white;
+  border: none;
+  cursor: pointer;
+  align-self: flex-end;
+}
 .return-btn {
   padding: 12px 30px;
   background-color: #95a5a6;
@@ -153,6 +201,16 @@
   border: none;
   border-radius: 8px;
   font-size: 18px;
+  cursor: pointer;
+}
+.add-friend-btn {
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
 }
 .kick-btn {
@@ -171,6 +229,55 @@
 }
 .kick-btn:hover {
   background: #e74c3c;
+}
+
+.friend-drawer {
+  width: min(100%, 300px);
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(20, 34, 48, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.friend-drawer-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff1c2;
+}
+
+.friend-drawer-empty {
+  margin-top: 10px;
+  color: #cdd9e4;
+  font-size: 14px;
+}
+
+.friend-drawer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.friend-drawer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.friend-invite-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #2fb96f;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 /* ====== 房间右上角设置区 ====== */
@@ -307,6 +414,11 @@
     font-size: 12px;
     padding: 6px 12px;
   }
+  .friend-toggle-btn {
+    font-size: 12px;
+    padding: 6px 12px;
+    margin-top: 8px;
+  }
   .settings-panel {
     width: 220px;
     padding: 10px;
@@ -352,10 +464,16 @@
     flex-wrap: nowrap;
     white-space: nowrap;
   }
+  .player-row-actions {
+    gap: 6px;
+  }
   .status-badge {
+    min-height: 24px;
+    padding: 3px 10px;
     font-size: 11px;
     margin: 0;
   }
+  .add-friend-btn,
   .player-row .kick-btn {
     padding: 4px 8px;
     font-size: 11px;
@@ -375,6 +493,22 @@
     padding: 9px 10px;
     font-size: 14px;
     line-height: 1.3;
+  }
+  .friend-drawer {
+    width: min(100%, 220px);
+    margin-top: 10px;
+    padding: 12px;
+  }
+  .friend-drawer-title {
+    font-size: 16px;
+  }
+  .friend-drawer-item {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+  .friend-invite-btn {
+    padding: 7px 12px;
+    font-size: 12px;
   }
   .waiting-actions.player-actions {
     grid-template-columns: 1fr;
@@ -415,6 +549,10 @@
     font-size: 14px;
   }
   .status-badge {
+    font-size: 10px;
+  }
+  .add-friend-btn,
+  .player-row .kick-btn {
     font-size: 10px;
   }
   .waiting-actions {

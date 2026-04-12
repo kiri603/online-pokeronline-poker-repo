@@ -1,22 +1,32 @@
 package com.game.poker.websocket;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.game.poker.auth.AuthHandshakeInterceptor;
+import com.game.poker.config.AllowedOriginsProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
+import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
 @Configuration
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
+    private final GameWebSocketHandler gameWebSocketHandler;
+    private final AuthHandshakeInterceptor authHandshakeInterceptor;
+    private final AllowedOriginsProperties allowedOriginsProperties;
 
-    @Autowired
-    private GameWebSocketHandler gameWebSocketHandler;
+    public WebSocketConfig(GameWebSocketHandler gameWebSocketHandler,
+                           AuthHandshakeInterceptor authHandshakeInterceptor,
+                           AllowedOriginsProperties allowedOriginsProperties) {
+        this.gameWebSocketHandler = gameWebSocketHandler;
+        this.authHandshakeInterceptor = authHandshakeInterceptor;
+        this.allowedOriginsProperties = allowedOriginsProperties;
+    }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        // 配置 WebSocket 的连接端点为 /ws/game
-        // 允许跨域请求 (setAllowedOrigins("*"))，方便本地 Vue 项目调试
-        registry.addHandler(gameWebSocketHandler, "/ws/game").setAllowedOrigins("*");
+        registry.addHandler(gameWebSocketHandler, "/ws/game")
+                .addInterceptors(new HttpSessionHandshakeInterceptor(), authHandshakeInterceptor)
+                .setAllowedOriginPatterns(allowedOriginsProperties.toArray());
     }
 }

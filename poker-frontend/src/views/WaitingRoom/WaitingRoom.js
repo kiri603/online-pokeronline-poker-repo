@@ -1,4 +1,5 @@
 import { computed } from "vue";
+import { authUser } from "@/store/gameState.js";
 import {
   showSettings,
   roomSettings,
@@ -13,6 +14,16 @@ import {
 } from "@/store/gameState.js";
 import { soundStatus, toggleSound, playBGM } from "@/store/audioManager.js";
 import { sendMsg, ws } from "@/store/gameSocket.js";
+import {
+  canUseSocial,
+  inviteFriendToRoom,
+  onlineFriends,
+  sendFriendRequest,
+  socialFriendIds,
+  socialIncomingFriendRequestIds,
+  socialDrawerOpen,
+  toggleWaitingFriendDrawer,
+} from "@/store/socialStore.js";
 
 const isOwner = computed(() => ownerId.value === userId.value);
 const isManager = computed(() => userId.value === "room_manager");
@@ -62,6 +73,25 @@ const waitingActionsClass = computed(() => ({
   "manager-actions": isManager.value,
 }));
 
+const waitingRoomFriendList = computed(() =>
+  onlineFriends.value.filter((friend) => friend.userId !== authUser.value?.username),
+);
+
+const isFriendPlayer = (player) =>
+  canUseSocial.value && socialFriendIds.value.has(player.userId);
+
+const canQuickAddFriend = (player) =>
+  canUseSocial.value &&
+  !player.isSelf &&
+  !player.isBot &&
+  !String(player.userId || "").startsWith("游客") &&
+  !socialFriendIds.value.has(player.userId) &&
+  !socialIncomingFriendRequestIds.value.has(player.userId);
+
+const quickAddFriend = async (player) => {
+  await sendFriendRequest(player.userId);
+};
+
 const disbandRoom = () => {
   if (confirm("🚨 警告：确定要彻底从内存中抹除这个房间，并踢出所有人吗？")) {
     sendMsg("DISBAND_ROOM", null);
@@ -109,6 +139,14 @@ export {
   isReady,
   otherPlayers,
   displayPlayers,
+  canUseSocial,
+  canQuickAddFriend,
+  socialDrawerOpen,
+  isFriendPlayer,
+  waitingRoomFriendList,
+  quickAddFriend,
+  toggleWaitingFriendDrawer,
+  inviteFriendToRoom,
   allReady,
   waitingActionsClass,
   handleScrollCardsChange,

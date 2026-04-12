@@ -6,11 +6,11 @@ poker-frontend/.env.local
 # === 后端忽略 ===
 poker/target/
 poker/*.jar
+poker/data/*.lock.db
+poker/data/*.trace.db
 
 # === IDE 忽略 ===
 .idea/
 .vscode/
 *.iml
 .DS_Store
-
-stackedit-export/

@@ -6,6 +6,8 @@ import {
   playBGM,
   stopCountdownAudio,
 } from "./audioManager.js";
+import { resetAuthState } from "./authStore.js";
+import { getTabAuthToken, getWsBaseUrl } from "./serverConfig.js";
 
 // 导出全局 WebSocket 实例
 export const ws = state.ws;
@@ -106,7 +108,11 @@ export const connectWebSocket = (isCreating = false) => {
   const serverIp = isLocal ? "localhost:8080" : "39.102.60.181:8080";
 
   // 4. 建立连接
-  ws.value = new WebSocket(`ws://${serverIp}/ws/game`);
+  const tabToken = getTabAuthToken();
+  const wsUrl = tabToken
+    ? `${getWsBaseUrl()}/ws/game?authToken=${encodeURIComponent(tabToken)}`
+    : `${getWsBaseUrl()}/ws/game`;
+  ws.value = new WebSocket(wsUrl);
   // ==============================================
   // 【连接成功钩子】
   ws.value.onopen = () => {
@@ -223,7 +229,7 @@ export const connectWebSocket = (isCreating = false) => {
   };
 
   // 【消息接收拦截器】
-  ws.value.onmessage = (event) => {
+  ws.value.onmessage = async (event) => {
     const res = JSON.parse(event.data);
 
     switch (res.event) {
@@ -514,6 +520,12 @@ export const connectWebSocket = (isCreating = false) => {
         emojiTimeouts[res.userId] = setTimeout(() => {
           delete state.activeEmojis.value[res.userId];
         }, 3000);
+        break;
+      case "FORCE_LOGOUT":
+        await resetAuthState(
+          res.msg || "账号已在其他设备登录，请重新登录",
+          { refreshCaptcha: true },
+        );
         break;
       case "SKILL_USED":
         if (res.skillName === "LUANJIAN") {

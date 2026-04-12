@@ -183,6 +183,8 @@ public class GameService {
         room.getSettings().remove("luanjian_initiator");
         room.getSettings().remove("jdsr_target");
         room.getSettings().remove("jdsr_initiator");
+        room.getSettings().remove("game_recorded");
+        room.getSettings().put("game_start_time", System.currentTimeMillis());
         room.setStarted(true);
         room.setPhase("PLAYING");
         // 【修改】：加入锦囊牌的发牌逻辑
@@ -893,6 +895,8 @@ public class GameService {
             room.getSettings().remove("luanjian_initiator");
             room.getSettings().remove("jdsr_target");
             room.getSettings().remove("jdsr_initiator");
+            room.getSettings().remove("game_recorded");
+            room.getSettings().remove("game_start_time");
             room.setStarted(false);
             room.getTableCards().clear();
             room.setLastPlayUserId("");
@@ -936,6 +940,17 @@ public class GameService {
     }
     public java.util.Collection<GameRoom> getAllRooms() {
         return roomMap.values();
+    }
+
+    public java.util.Set<String> getAllActiveUserIds() {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (GameRoom room : roomMap.values()) {
+            for (Player player : room.getPlayers()) {
+                ids.add(player.getUserId());
+            }
+            ids.addAll(room.getSpectators());
+        }
+        return ids;
     }
     // 【新增】：踢出玩家
 /*    public void kickPlayer(String roomId, String ownerId, String targetId) {
