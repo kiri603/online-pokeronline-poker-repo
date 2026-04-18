@@ -5,7 +5,7 @@
 ## 🌐 在线体验与源码
 
   - **在线游玩地址：** [http://39.102.60.181/](http://39.102.60.181/)
-  - **GitHub 源码：** [https://github.com/kiri603/online-pokeronline-poker-repo/](https://github.com/kiri603/online-pokeronline-poker-repo/)
+  - **GitHub 源码：** [https://github.com/kiri603/online-poker-repo/](https://github.com/kiri603/online-poker-repo/)
 
 ## 💡 项目简介
 
