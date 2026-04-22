@@ -79,6 +79,15 @@ export const skillCountdown = ref(20);
 export const skillTimer = ref(null);
 
 export const emojiList = ref([
+  "mascot_01_xiao.png",
+  "mascot_02_kaixin.png",
+  "mascot_03_wuyu.png",
+  "mascot_04_shengqi.png",
+  "mascot_05_yun.png",
+  "mascot_06_exin.png",
+  "mascot_07_haixiu.png",
+  "mascot_08_shiai.png",
+  "mascot_09_deyi.png",
   "image_emoticon.png",
   "image_emoticon2.png",
   "image_emoticon3.png",

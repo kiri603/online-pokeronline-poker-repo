@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mascot emoji QA preview</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #243144;
+        color: #eaeaea;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
+      p.hint {
+        margin: 0 0 24px;
+        opacity: 0.7;
+        font-size: 13px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 18px;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .card .slug {
+        font-size: 12px;
+        font-family: ui-monospace, Consolas, monospace;
+        opacity: 0.85;
+        word-break: break-all;
+        text-align: center;
+      }
+      /* Replicates `.emoji-bubble` from GameBoard.css. */
+      .bubble {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 50%;
+        padding: 5px;
+        width: 45px;
+        height: 45px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .bubble img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      /* Replicates `.emoji-item` from GameBoard.css (picker tile). */
+      .picker {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 8px;
+      }
+      .picker img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      /* Large raw preview (no frame). */
+      .raw {
+        width: 160px;
+        height: 160px;
+        background: repeating-conic-gradient(#1f2b3a 0% 25%, #2b384a 0% 50%) 50% / 16px
+          16px;
+        border-radius: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .raw img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .row {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .legend {
+        font-size: 11px;
+        opacity: 0.6;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Mascot emoji circle-frame QA</h1>
+    <p class="hint">
+      Each card shows the generated PNG inside the 45px game bubble (circle),
+      the 60px picker tile (square), and a large checkered preview. The sticker
+      must stay fully inside the round bubble in every card.
+    </p>
+    <div id="grid" class="grid"></div>
+    <script>
+      const SLUGS = [
+        "mascot_01_xiao",
+        "mascot_02_kaixin",
+        "mascot_03_wuyu",
+        "mascot_04_shengqi",
+        "mascot_05_yun",
+        "mascot_06_exin",
+        "mascot_07_haixiu",
+        "mascot_08_shiai",
+        "mascot_09_deyi",
+      ];
+      const base = "../poker-frontend/public/images/emojis";
+      const grid = document.getElementById("grid");
+      for (const slug of SLUGS) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="slug">${slug}.png</div>
+          <div class="row">
+            <div class="bubble" title="45px bubble"><img src="${base}/${slug}.png" /></div>
+            <div class="picker" title="60px picker"><img src="${base}/${slug}.png" /></div>
+          </div>
+          <div class="raw"><img src="${base}/${slug}.png" /></div>
+          <div class="legend">bubble / picker / raw</div>
+        `;
+        grid.appendChild(card);
+      }
+    </script>
+  </body>
+</html>

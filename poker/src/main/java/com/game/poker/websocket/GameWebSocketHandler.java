@@ -60,6 +60,17 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     private static final String EMOJI_THINKING = "image_emoticon73.png";
     private static final String EMOJI_FINGER_HEART = "image_emoticon88.png";
 
+    // Mascot sticker set (preferred in bot scenario pools).
+    private static final String MASCOT_XIAO = "mascot_01_xiao.png";
+    private static final String MASCOT_KAIXIN = "mascot_02_kaixin.png";
+    private static final String MASCOT_WUYU = "mascot_03_wuyu.png";
+    private static final String MASCOT_SHENGQI = "mascot_04_shengqi.png";
+    private static final String MASCOT_YUN = "mascot_05_yun.png";
+    private static final String MASCOT_EXIN = "mascot_06_exin.png";
+    private static final String MASCOT_HAIXIU = "mascot_07_haixiu.png";
+    private static final String MASCOT_SHIAI = "mascot_08_shiai.png";
+    private static final String MASCOT_DEYI = "mascot_09_deyi.png";
+
     @Autowired
     private GameService gameService;
 
@@ -1022,15 +1033,15 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
 
         List<String> pool = switch (scenario) {
-            case TRICK_ATTACK -> List.of(EMOJI_SMUG, EMOJI_SLY, EMOJI_PLAYFUL, EMOJI_CONFUSED, EMOJI_ANGRY);
-            case AGGRESSIVE_PLAY -> List.of(EMOJI_ANGRY, EMOJI_SMUG, EMOJI_SLY, EMOJI_HUFFING, EMOJI_PLAYFUL);
-            case TACTICAL_PLAY -> List.of(EMOJI_THINKING, EMOJI_WRY, EMOJI_SMUG, EMOJI_LOVING, EMOJI_FINGER_HEART);
-            case PRESSURED_PASS -> List.of(EMOJI_STRESSED, EMOJI_CRYING, EMOJI_CONFUSED, EMOJI_THINKING, EMOJI_SICK, EMOJI_PLEADING);
-            case DEFENSE_SUCCESS -> List.of(EMOJI_SMUG, EMOJI_WRY, EMOJI_THINKING, EMOJI_HUFFING);
-            case DEFENSE_FAIL -> List.of(EMOJI_STRESSED, EMOJI_CRYING, EMOJI_SICK, EMOJI_BROKEN_HEART, EMOJI_PLEADING);
-            case CLOSE_TO_WIN -> List.of(EMOJI_LAUGHING, EMOJI_SMILE, EMOJI_SMUG, EMOJI_PLAYFUL, EMOJI_HUGGING, EMOJI_FINGER_HEART);
-            case OPPONENT_IN_DANGER -> List.of(EMOJI_SMUG, EMOJI_SLY, EMOJI_LAUGHING, EMOJI_HUFFING, EMOJI_THINKING);
-            case VICTORY -> List.of(EMOJI_LAUGHING, EMOJI_SMILE, EMOJI_LOVING, EMOJI_HUGGING, EMOJI_HEART, EMOJI_ROSE, EMOJI_FINGER_HEART);
+            case TRICK_ATTACK -> List.of(MASCOT_DEYI, MASCOT_XIAO, MASCOT_WUYU, MASCOT_SHENGQI, EMOJI_SMUG, EMOJI_SLY);
+            case AGGRESSIVE_PLAY -> List.of(MASCOT_SHENGQI, MASCOT_DEYI, MASCOT_XIAO, EMOJI_ANGRY, EMOJI_HUFFING);
+            case TACTICAL_PLAY -> List.of(MASCOT_DEYI, MASCOT_KAIXIN, MASCOT_SHIAI, EMOJI_THINKING, EMOJI_FINGER_HEART);
+            case PRESSURED_PASS -> List.of(MASCOT_YUN, MASCOT_EXIN, MASCOT_WUYU, MASCOT_HAIXIU, EMOJI_STRESSED, EMOJI_CRYING);
+            case DEFENSE_SUCCESS -> List.of(MASCOT_DEYI, MASCOT_KAIXIN, MASCOT_XIAO, EMOJI_SMUG);
+            case DEFENSE_FAIL -> List.of(MASCOT_EXIN, MASCOT_YUN, MASCOT_WUYU, EMOJI_STRESSED, EMOJI_BROKEN_HEART);
+            case CLOSE_TO_WIN -> List.of(MASCOT_XIAO, MASCOT_KAIXIN, MASCOT_DEYI, MASCOT_SHIAI, EMOJI_LAUGHING, EMOJI_HUGGING);
+            case OPPONENT_IN_DANGER -> List.of(MASCOT_DEYI, MASCOT_XIAO, MASCOT_SHENGQI, EMOJI_SMUG, EMOJI_SLY);
+            case VICTORY -> List.of(MASCOT_XIAO, MASCOT_KAIXIN, MASCOT_SHIAI, MASCOT_DEYI, EMOJI_LAUGHING, EMOJI_HEART, EMOJI_ROSE);
         };
 
         String lastEmoji = botLastEmoji.get(botKey);
