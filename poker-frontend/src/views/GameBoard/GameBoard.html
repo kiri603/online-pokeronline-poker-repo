@@ -30,7 +30,6 @@
 
       <div class="player-name">
         {{ player.userId }}
-        <span v-if="player.isBot" class="turn-badge">脚本AI</span>
         <span
           v-if="currentTurn === player.userId && !currentAoeType"
           class="turn-badge"
