@@ -31,9 +31,12 @@ import argparse
 import math
 from pathlib import Path
 
+import random
+
 import numpy as np
 from PIL import Image, ImageDraw
-from scipy.ndimage import label
+from scipy.ndimage import binary_erosion, label
+from scipy.spatial import ConvexHull
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -61,10 +64,12 @@ LABEL_CROP_RATIO = 0.78
 # outline stops the fill.
 FLOOD_TOLERANCE = 42
 
-# Safety multiplier applied to the bounding-box diagonal when computing the
-# square canvas side. 1.0 would inscribe the bbox corners on the circle; a bit
-# of headroom (1.06) keeps the character visually comfortable inside the bubble.
-CIRCLE_SAFETY = 1.06
+# Safety multiplier applied to the minimum-enclosing-circle radius of the
+# sticker's opaque silhouette when sizing the square canvas. Because we fit to
+# the actual silhouette (not the bounding-box diagonal), the sticker fills the
+# circular bubble almost edge-to-edge. A small margin keeps anti-aliased edge
+# pixels from being clipped by `border-radius: 50%`.
+CIRCLE_SAFETY = 1.03
 
 # Chroma-key residual pass: any still-opaque pixel that is clearly warm-cream
 # (R > G > B with noticeable gaps) gets cleared. This catches small beige
@@ -209,18 +214,107 @@ def tight_trim(img: Image.Image) -> Image.Image:
     return img.crop(bbox)
 
 
+def _min_enclosing_circle(points: np.ndarray) -> tuple[float, float, float]:
+    """Return (cx, cy, r) of the smallest circle that contains all points.
+
+    Uses Welzl's algorithm iteratively; only a handful of convex-hull vertices
+    are actually required so the input is expected to be the hull of the
+    sticker silhouette.
+    """
+    pts = [tuple(p) for p in points.tolist()]
+    random.Random(0).shuffle(pts)
+
+    def in_circle(c, p):
+        if c is None:
+            return False
+        dx = p[0] - c[0]
+        dy = p[1] - c[1]
+        return dx * dx + dy * dy <= c[2] * c[2] + 1e-7
+
+    def diameter(p, q):
+        return ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2,
+                math.hypot(p[0] - q[0], p[1] - q[1]) / 2)
+
+    def circumscribed(p, q, r):
+        ax, ay = p
+        bx, by = q
+        cx, cy = r
+        d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+        if abs(d) < 1e-12:
+            return diameter(p, q)
+        ux = (
+            (ax * ax + ay * ay) * (by - cy)
+            + (bx * bx + by * by) * (cy - ay)
+            + (cx * cx + cy * cy) * (ay - by)
+        ) / d
+        uy = (
+            (ax * ax + ay * ay) * (cx - bx)
+            + (bx * bx + by * by) * (ax - cx)
+            + (cx * cx + cy * cy) * (bx - ax)
+        ) / d
+        return (ux, uy, math.hypot(ux - ax, uy - ay))
+
+    def with_two(boundary_pts, p, q):
+        c = diameter(p, q)
+        for i, r in enumerate(boundary_pts):
+            if not in_circle(c, r):
+                c = circumscribed(p, q, r)
+        return c
+
+    def with_one(boundary_pts, p):
+        c = (p[0], p[1], 0.0)
+        for i, q in enumerate(boundary_pts):
+            if not in_circle(c, q):
+                c = with_two(boundary_pts[:i], p, q)
+        return c
+
+    c = None
+    for i, p in enumerate(pts):
+        if not in_circle(c, p):
+            c = with_one(pts[:i], p)
+    return c if c is not None else (0.0, 0.0, 0.0)
+
+
 def pad_to_circle_safe_square(sticker: Image.Image) -> Image.Image:
-    """Center the sticker inside a transparent square whose side is at least
-    the bounding-box diagonal. Ensures the sticker fits inside the inscribed
-    circle of the square when rendered under `border-radius: 50%`."""
+    """Center the sticker inside a transparent square whose inscribed circle
+    just contains the sticker's opaque silhouette.
+
+    Fitting to the minimum enclosing circle (instead of the bbox diagonal)
+    lets the sticker fill the round bubble almost edge-to-edge rather than
+    leaving the bbox corners as wasted empty space.
+    """
+    arr = np.array(sticker)
+    if arr.ndim != 3 or arr.shape[2] != 4:
+        return sticker
+    mask = arr[:, :, 3] > 0
+    if not mask.any():
+        return sticker
+
+    boundary = mask & ~binary_erosion(mask)
+    ys, xs = np.where(boundary)
+    points = np.column_stack([xs, ys])
+
+    if len(points) >= 4:
+        try:
+            hull = ConvexHull(points)
+            points = points[hull.vertices]
+        except Exception:
+            pass
+
+    cx, cy, r = _min_enclosing_circle(points.astype(float))
+
     w, h = sticker.size
-    diagonal = math.sqrt(w * w + h * h)
-    side = math.ceil(diagonal * CIRCLE_SAFETY)
+    side = max(
+        math.ceil(2 * r * CIRCLE_SAFETY),
+        math.ceil(max(w, h) * 1.01),
+    )
     if side % 2:
         side += 1
+
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    offset = ((side - w) // 2, (side - h) // 2)
-    canvas.paste(sticker, offset, sticker)
+    offset_x = int(round(side / 2 - cx))
+    offset_y = int(round(side / 2 - cy))
+    canvas.paste(sticker, (offset_x, offset_y), sticker)
     return canvas
 
 

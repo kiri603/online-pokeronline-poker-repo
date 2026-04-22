@@ -45,8 +45,20 @@
         word-break: break-all;
         text-align: center;
       }
-      /* Replicates `.emoji-bubble` from GameBoard.css. */
-      .bubble {
+      /* Replicates `.emoji-bubble` from GameBoard.css (PC default). */
+      .bubble-pc {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 50%;
+        padding: 8px;
+        width: 72px;
+        height: 72px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      /* Mobile bubble (max-width: 768px override). */
+      .bubble-mobile {
         background: rgba(255, 255, 255, 0.95);
         border-radius: 50%;
         padding: 5px;
@@ -57,15 +69,16 @@
         justify-content: center;
         align-items: center;
       }
-      .bubble img {
+      .bubble-pc img,
+      .bubble-mobile img {
         width: 100%;
         height: 100%;
         object-fit: contain;
       }
-      /* Replicates `.emoji-item` from GameBoard.css (picker tile). */
+      /* Replicates `.emoji-item` from GameBoard.css (PC picker tile). */
       .picker {
-        width: 60px;
-        height: 60px;
+        width: 80px;
+        height: 80px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -133,11 +146,12 @@
         card.innerHTML = `
           <div class="slug">${slug}.png</div>
           <div class="row">
-            <div class="bubble" title="45px bubble"><img src="${base}/${slug}.png" /></div>
-            <div class="picker" title="60px picker"><img src="${base}/${slug}.png" /></div>
+            <div class="bubble-pc" title="PC 72px bubble"><img src="${base}/${slug}.png" /></div>
+            <div class="bubble-mobile" title="Mobile 45px bubble"><img src="${base}/${slug}.png" /></div>
+            <div class="picker" title="PC 80px picker"><img src="${base}/${slug}.png" /></div>
           </div>
           <div class="raw"><img src="${base}/${slug}.png" /></div>
-          <div class="legend">bubble / picker / raw</div>
+          <div class="legend">PC bubble / mobile bubble / PC picker</div>
         `;
         grid.appendChild(card);
       }
