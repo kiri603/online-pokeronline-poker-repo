@@ -1,60 +1,164 @@
 <div class="auth-shell">
-  <div v-if="!authChecked" class="auth-card auth-loading">
+  <div v-if="!authChecked" class="auth-loading-card">
+    <div class="loading-spinner" aria-hidden="true"></div>
     <h2 class="auth-loading-title">正在恢复登录</h2>
-    <p>请稍候，系统正在识别这个设备上次使用的账号。</p>
+    <p class="auth-loading-desc">请稍候，系统正在识别这个设备上次使用的账号。</p>
   </div>
 
-  <div v-else class="auth-card">
-    <h1 class="auth-title">三国斗地主</h1>
+  <template v-else>
+    <div class="auth-vignette" aria-hidden="true"></div>
 
-    <div class="auth-tabs">
-      <button
-        :class="['auth-tab', { active: authMode === 'login' }]"
-        @click="switchAuthMode('login')"
-      >
-        登录
-      </button>
-      <button
-        :class="['auth-tab', { active: authMode === 'register' }]"
-        @click="switchAuthMode('register')"
-      >
-        注册
-      </button>
+    <section class="auth-hero">
+      <h1 class="auth-title">
+        <span class="auth-title-text">三国斗地主</span>
+      </h1>
+      <p class="auth-subtitle">斗智斗牌 · 乐享三国</p>
+      <p class="auth-tagline">经典玩法 · 轻松上手 · 随时开局</p>
+
+      <div class="auth-cta-row">
+        <button
+          type="button"
+          class="cta cta-primary"
+          :disabled="authLoading"
+          @click="submitGuestLogin"
+        >
+          <svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+            <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11.5-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z"/>
+          </svg>
+          <span class="cta-labels">
+            <span class="cta-main">快速开始</span>
+            <span class="cta-sub">QUICK START</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="cta cta-secondary"
+          :disabled="authLoading"
+          @click="openAuthModal"
+        >
+          <svg class="cta-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>
+            <path d="M4 21a8 8 0 1 1 16 0"/>
+          </svg>
+          <span class="cta-labels">
+            <span class="cta-main">账号登录</span>
+            <span class="cta-sub">ACCOUNT LOGIN</span>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <div
+      v-if="authModalVisible"
+      class="auth-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="auth-modal-title"
+      @click.self="closeAuthModal"
+    >
+      <div class="auth-modal">
+        <button
+          type="button"
+          class="modal-close"
+          aria-label="关闭登录"
+          @click="closeAuthModal"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6L6 18"/>
+            <path d="M6 6l12 12"/>
+          </svg>
+        </button>
+
+        <h2 id="auth-modal-title" class="modal-title">
+          {{ authMode === 'register' ? '注册账号' : '账号登录' }}
+        </h2>
+        <p class="modal-subtitle">欢迎回到三国战局</p>
+
+        <div class="auth-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="authMode === 'login'"
+            :class="['auth-tab', { active: authMode === 'login' }]"
+            @click="switchAuthMode('login')"
+          >
+            登录
+          </button>
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="authMode === 'register'"
+            :class="['auth-tab', { active: authMode === 'register' }]"
+            @click="switchAuthMode('register')"
+          >
+            注册
+          </button>
+        </div>
+
+        <label class="field">
+          <span class="field-label">用户名</span>
+          <input
+            v-model.trim="authUsername"
+            maxlength="20"
+            placeholder="用户名（4-20位）"
+          />
+        </label>
+
+        <label class="field">
+          <span class="field-label">密码</span>
+          <input
+            v-model="authPassword"
+            type="password"
+            maxlength="64"
+            placeholder="密码（至少8位，需含字母和数字）"
+            @keyup.enter="submitAuth"
+          />
+        </label>
+
+        <label class="field captcha-field">
+          <span class="field-label">验证码</span>
+          <div class="captcha-row">
+            <input
+              v-model.trim="authCaptchaCode"
+              maxlength="8"
+              placeholder="请输入验证码"
+              @keyup.enter="submitAuth"
+            />
+            <img
+              v-if="authCaptchaImage"
+              :src="authCaptchaImage"
+              alt="点击刷新验证码"
+              title="点击刷新"
+              class="captcha-image"
+              @click="refreshCaptcha"
+            />
+          </div>
+        </label>
+
+        <p v-if="authError" class="auth-message error" role="alert">{{ authError }}</p>
+        <p v-if="authSuccess" class="auth-message success" role="status">{{ authSuccess }}</p>
+
+        <button
+          type="button"
+          class="modal-submit"
+          :disabled="authLoading"
+          @click="submitAuth"
+        >
+          {{ authLoading ? '提交中...' : authMode === 'register' ? '注册并进入大厅' : '登录进入大厅' }}
+        </button>
+
+        <p class="modal-hint">
+          还没账号？
+          <button
+            type="button"
+            class="modal-link"
+            @click="switchAuthMode(authMode === 'login' ? 'register' : 'login')"
+          >
+            {{ authMode === 'login' ? '点此注册' : '返回登录' }}
+          </button>
+        </p>
+      </div>
     </div>
-
-    <input v-model.trim="authUsername" maxlength="20" placeholder="用户名（4-20位）" />
-    <input
-      v-model="authPassword"
-      type="password"
-      maxlength="64"
-      placeholder="密码（至少8位，需含字母和数字）"
-    />
-
-    <div class="captcha-row">
-      <input
-        v-model.trim="authCaptchaCode"
-        maxlength="8"
-        placeholder="请输入验证码"
-        @keyup.enter="submitAuth"
-      />
-      <img
-        v-if="authCaptchaImage"
-        :src="authCaptchaImage"
-        alt="captcha"
-        class="captcha-image"
-        @click="refreshCaptcha"
-      />
-    </div>
-
-    <p v-if="authError" class="auth-message error">{{ authError }}</p>
-    <p v-if="authSuccess" class="auth-message success">{{ authSuccess }}</p>
-
-    <button class="submit-btn" :disabled="authLoading" @click="submitAuth">
-      {{ authLoading ? '提交中...' : authMode === 'register' ? '注册并进入大厅' : '登录进入大厅' }}
-    </button>
-
-    <button class="guest-btn" :disabled="authLoading" @click="submitGuestLogin">
-      游客登录
-    </button>
-  </div>
+  </template>
 </div>

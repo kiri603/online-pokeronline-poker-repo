@@ -1,3 +1,4 @@
+import { ref } from "vue";
 import {
   authCaptchaCode,
   authCaptchaImage,
@@ -15,6 +16,18 @@ import {
   submitGuestLogin,
   switchAuthMode,
 } from "@/store/authStore.js";
+
+export const authModalVisible = ref(false);
+
+export const openAuthModal = () => {
+  authError.value = "";
+  authSuccess.value = "";
+  authModalVisible.value = true;
+};
+
+export const closeAuthModal = () => {
+  authModalVisible.value = false;
+};
 
 export {
   authCaptchaCode,
