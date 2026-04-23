@@ -30,6 +30,15 @@ public class RoomController {
                 item.put("roomId", room.getRoomId());
                 item.put("playerCount", room.getPlayers().size());
                 item.put("status", room.isStarted() ? "PLAYING" : "WAITING");
+                // Expose the two room-mode flags so the lobby can render
+                // 锦囊 / 技能 / 锦囊+技能 / 经典 labels on each room card.
+                Map<String, Object> settings = room.getSettings();
+                boolean enableScrollCards = settings != null
+                        && Boolean.TRUE.equals(settings.get("enableScrollCards"));
+                boolean enableSkills = settings != null
+                        && Boolean.TRUE.equals(settings.get("enableSkills"));
+                item.put("enableScrollCards", enableScrollCards);
+                item.put("enableSkills", enableSkills);
                 rooms.add(item);
             }
         }

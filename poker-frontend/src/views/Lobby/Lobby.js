@@ -132,9 +132,10 @@ const closeInfoPanel = () => {
   showUpdates.value = false;
 };
 
-// Derive a human-readable mode label for each room. The server payload is
-// best-effort: when no flags are present we default to "经典模式" which is
-// what the lobby used historically.
+// Derive a human-readable mode label for each room. Flags may arrive either
+// at the top level (legacy / current /api/rooms payload) or nested under
+// `settings` (websocket room snapshots). Default to 经典 when neither flag
+// is present.
 const hasScrollCards = (room) =>
   Boolean(
     room?.enableScrollCards ||
@@ -148,12 +149,21 @@ const hasSkills = (room) =>
   );
 
 const getRoomModeLabel = (room) => {
-  if (hasScrollCards(room) || hasSkills(room)) return "锦囊技能";
-  return "经典模式";
+  const scroll = hasScrollCards(room);
+  const skill = hasSkills(room);
+  if (scroll && skill) return "锦囊/技能";
+  if (scroll) return "锦囊";
+  if (skill) return "技能";
+  return "经典";
 };
 
 const getRoomModeClass = (room) => {
-  return hasScrollCards(room) || hasSkills(room) ? "fancy" : "";
+  const scroll = hasScrollCards(room);
+  const skill = hasSkills(room);
+  if (scroll && skill) return "mode-both";
+  if (scroll) return "mode-scroll";
+  if (skill) return "mode-skill";
+  return "mode-classic";
 };
 
 const getRoomCapacity = (room) =>

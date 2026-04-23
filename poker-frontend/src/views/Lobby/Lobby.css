@@ -560,6 +560,31 @@
   box-shadow: 0 2px 4px rgba(18, 42, 96, 0.3);
 }
 
+/* 经典 — default blue (same as above, explicit alias) */
+.room-card-mode.mode-classic {
+  background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+  box-shadow: 0 2px 4px rgba(18, 42, 96, 0.3);
+}
+
+/* 锦囊 — emerald green */
+.room-card-mode.mode-scroll {
+  background: linear-gradient(180deg, #10b981, #047857);
+  box-shadow: 0 2px 4px rgba(4, 80, 60, 0.35);
+}
+
+/* 技能 — crimson red */
+.room-card-mode.mode-skill {
+  background: linear-gradient(180deg, #ef4444, #991b1b);
+  box-shadow: 0 2px 4px rgba(120, 16, 16, 0.35);
+}
+
+/* 锦囊/技能 — gold gradient reserved for the all-in combo mode */
+.room-card-mode.mode-both {
+  background: linear-gradient(180deg, #f59e0b, #b45309);
+  box-shadow: 0 2px 4px rgba(120, 66, 12, 0.35);
+}
+
+/* Legacy alias kept so older code paths (if any) still render sensibly. */
 .room-card-mode.fancy {
   background: linear-gradient(180deg, #f59e0b, #b45309);
   box-shadow: 0 2px 4px rgba(120, 66, 12, 0.35);
