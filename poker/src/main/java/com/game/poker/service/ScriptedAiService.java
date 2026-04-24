@@ -20,6 +20,10 @@ import java.util.stream.Collectors;
 @Service
 public class ScriptedAiService {
     private static final List<String> BOT_SKILLS = List.of("ZHIHENG", "LUANJIAN", "GUANXING", "GUSHOU", "KUROU", "TIEQI");
+
+    // 用于让 candidateScore 在「这手打完即赢」的候选上始终返回最小分数。
+    // 取一个远小于普通 score 可能到达区间的常量（普通 score 通常在几十到几千）。
+    private static final int FINISHING_PLAY_SCORE = -1_000_000;
 /*
 
     private static final String SUIT_SPADE = "♠";
@@ -283,6 +287,10 @@ public class ScriptedAiService {
         if (hand.size() > 10) {
             return false;
         }
+        // 一手清空手牌即可获胜时，必须打出，不能用固守保留炸弹/王炸
+        if (isFinishingPlay(hand, bestNormal)) {
+            return false;
+        }
         if (bestNormal == null) {
             return true;
         }
@@ -298,6 +306,10 @@ public class ScriptedAiService {
         if (bestScroll != null || aliveOpponents(room, bot) < 2) {
             return false;
         }
+        // 一手清空手牌即可获胜时，必须打出，不能用乱箭消耗掉收官的炸弹/王炸
+        if (isFinishingPlay(safeHand(bot), bestNormal)) {
+            return false;
+        }
         if (bestNormal == null) {
             return !freeTurn || isThreatSituation(room, bot);
         }
@@ -307,11 +319,16 @@ public class ScriptedAiService {
     }
 
     private boolean shouldReplace(Player bot, boolean freeTurn, PlayCandidate bestNormal, int currentTurns) {
-        if (safeHand(bot).size() <= 1) {
+        List<Card> hand = safeHand(bot);
+        if (hand.size() <= 1) {
+            return false;
+        }
+        // 一手清空手牌即可获胜时，必须打出，不能用制衡把收官的王炸/炸弹换没了
+        if (isFinishingPlay(hand, bestNormal)) {
             return false;
         }
         if (freeTurn) {
-            return bestNormal == null || currentTurns >= Math.min(5, safeHand(bot).size());
+            return bestNormal == null || currentTurns >= Math.min(5, hand.size());
         }
         return bestNormal == null || bestNormal.kind == PatternKind.BOMB || bestNormal.kind == PatternKind.ROCKET;
     }
@@ -430,6 +447,15 @@ public class ScriptedAiService {
 
     private int candidateScore(List<Card> hand, PlayCandidate candidate, boolean freeTurn, Map<String, Integer> cache) {
         List<Card> remaining = removeCards(hand, candidate.cards);
+
+        // 能一手清空手牌（直接获胜）的出法永远视为最优，避免王炸/炸弹
+        // 被 kind 惩罚与 disruption 惩罚压过 turnsAfter=0 的优势，
+        // 导致手里只剩小王 + 大王时被拆成两张单牌分开出。
+        // 以 primaryWeight 做稳定的 tiebreak。
+        if (remaining.isEmpty()) {
+            return FINISHING_PLAY_SCORE + candidate.primaryWeight;
+        }
+
         int turnsAfter = estimateTurnsToFinish(remaining, cache);
         int disruption = playDisruptionCost(hand, candidate);
         int score = turnsAfter * (freeTurn ? 100 : 120)
@@ -767,6 +793,14 @@ public class ScriptedAiService {
                 .filter(card -> !SUIT_SCROLL.equals(card.getSuit()))
                 .min(Comparator.comparingInt(card -> discardCost(hand, card)))
                 .orElse(null);
+    }
+
+    /**
+     * 判断该候选是否一手打完就能清空手牌（即打出即获胜）。
+     * 用于阻止技能/锦囊分支把收官的王炸、炸弹拆散或换掉。
+     */
+    private boolean isFinishingPlay(List<Card> hand, PlayCandidate candidate) {
+        return candidate != null && !hand.isEmpty() && candidate.cards.size() == hand.size();
     }
 
     private boolean isThreatSituation(GameRoom room, Player bot) {

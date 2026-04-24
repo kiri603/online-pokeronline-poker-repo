@@ -219,6 +219,161 @@ class ScriptedAiServiceTest {
         assertEquals(List.of(card("\u2663", "9", 7), card("\u2665", "9", 7)), emergencyPlay);
     }
 
+    @Test
+    void botPlaysRocketAsOneHandWhenItFinishesTheGame() throws Exception {
+        // 回归：只剩小王 + 大王时，AI 必须整手打王炸赢下这一局，
+        // 而不是拆成两张单牌分开出。
+        ScriptedAiService service = createServiceWithRuleEngine();
+        GameRoom room = new GameRoom("room-rocket-finish");
+
+        Player bot = new Player("bot", true);
+        bot.setStatus("PLAYING");
+        bot.getHandCards().add(card("JOKER", "\u5c0f\u738b", 14));
+        bot.getHandCards().add(card("JOKER", "\u5927\u738b", 15));
+
+        Player other = new Player("other");
+        other.setStatus("PLAYING");
+        other.getHandCards().add(card("\u2660", "3", 1));
+        other.getHandCards().add(card("\u2665", "3", 1));
+        other.getHandCards().add(card("\u2663", "3", 1));
+        other.getHandCards().add(card("\u2666", "3", 1));
+        other.getHandCards().add(card("\u2660", "4", 2));
+
+        room.setPlayers(new ArrayList<>(List.of(bot, other)));
+        room.setCurrentTurnIndex(0);
+        room.setLastPlayedCards(new ArrayList<>());
+        room.setLastPlayPlayerId("");
+
+        ScriptedAiService.TurnDecision decision = service.decideTurn(room, bot);
+
+        assertEquals(ScriptedAiService.TurnDecisionType.PLAY, decision.getType());
+        assertEquals(2, decision.getCards().size(),
+                "\u53ea\u5269\u738b\u70b8\u65f6\u5e94\u4e00\u624b\u6253\u51fa\u4e24\u5f20\u7687\uff0c\u4e0d\u5e94\u62c6\u5206");
+    }
+
+    @Test
+    void botPlaysRocketToFinishEvenWhenRespondingToOpponent() throws Exception {
+        // 回归：对手出单牌、AI 手里只剩小王 + 大王时，
+        // 虽然单王也能压得住，但整手打王炸才能即刻获胜。
+        ScriptedAiService service = createServiceWithRuleEngine();
+        GameRoom room = new GameRoom("room-rocket-response");
+
+        Player opponent = new Player("p1");
+        opponent.setStatus("PLAYING");
+        Player bot = new Player("bot", true);
+        bot.setStatus("PLAYING");
+        bot.getHandCards().add(card("JOKER", "\u5c0f\u738b", 14));
+        bot.getHandCards().add(card("JOKER", "\u5927\u738b", 15));
+
+        room.setPlayers(new ArrayList<>(List.of(opponent, bot)));
+        room.setCurrentTurnIndex(1);
+        room.setLastPlayPlayerId(opponent.getUserId());
+        room.setLastPlayedCards(new ArrayList<>(List.of(card("\u2660", "5", 3))));
+
+        ScriptedAiService.TurnDecision decision = service.decideTurn(room, bot);
+
+        assertEquals(ScriptedAiService.TurnDecisionType.PLAY, decision.getType());
+        assertEquals(2, decision.getCards().size(),
+                "\u6700\u540e\u4e00\u624b\u738b\u70b8\u5e94\u76f4\u63a5\u6253\u51fa\u62ff\u4e0b\u80dc\u5229");
+    }
+
+    @Test
+    void gushouBotPlaysRocketToWinInsteadOfSkippingTurn() throws Exception {
+        // GUSHOU（固守）在 bestNormal 是炸弹/王炸时会选择跳过保留资源，
+        // 但只剩王炸能直接获胜时，必须打出，不能跳过。
+        ScriptedAiService service = createServiceWithRuleEngine();
+        GameRoom room = new GameRoom("room-gushou-rocket-finish");
+
+        Player opponent = new Player("p1");
+        opponent.setStatus("PLAYING");
+        Player bot = new Player("bot", true);
+        bot.setStatus("PLAYING");
+        bot.setSkill("GUSHOU");
+        bot.getHandCards().add(card("JOKER", "\u5c0f\u738b", 14));
+        bot.getHandCards().add(card("JOKER", "\u5927\u738b", 15));
+
+        room.setPlayers(new ArrayList<>(List.of(opponent, bot)));
+        room.setCurrentTurnIndex(1);
+        room.setLastPlayPlayerId(opponent.getUserId());
+        room.setLastPlayedCards(new ArrayList<>(List.of(card("\u2660", "5", 3))));
+
+        ScriptedAiService.TurnDecision decision = service.decideTurn(room, bot);
+
+        assertEquals(ScriptedAiService.TurnDecisionType.PLAY, decision.getType());
+        assertEquals(2, decision.getCards().size());
+    }
+
+    @Test
+    void luanjianBotPlaysBombToWinInsteadOfUsingSkill() throws Exception {
+        // LUANJIAN（乱箭）平时会用 2 张黑牌触发 AoE 而留住炸弹，
+        // 但只剩一手炸弹能直接获胜时，必须整手打出，不能消耗掉收官的炸弹。
+        ScriptedAiService service = createServiceWithRuleEngine();
+        GameRoom room = new GameRoom("room-luanjian-bomb-finish");
+
+        Player bot = new Player("bot", true);
+        bot.setStatus("PLAYING");
+        bot.setSkill("LUANJIAN");
+        bot.getHandCards().add(card("\u2660", "K", 11));
+        bot.getHandCards().add(card("\u2665", "K", 11));
+        bot.getHandCards().add(card("\u2663", "K", 11));
+        bot.getHandCards().add(card("\u2666", "K", 11));
+
+        Player a = new Player("a");
+        a.setStatus("PLAYING");
+        Player b = new Player("b");
+        b.setStatus("PLAYING");
+        a.getHandCards().add(card("\u2660", "3", 1));
+        a.getHandCards().add(card("\u2660", "4", 2));
+        a.getHandCards().add(card("\u2660", "5", 3));
+        b.getHandCards().add(card("\u2665", "3", 1));
+        b.getHandCards().add(card("\u2665", "4", 2));
+        b.getHandCards().add(card("\u2665", "5", 3));
+
+        room.setPlayers(new ArrayList<>(List.of(bot, a, b)));
+        room.setCurrentTurnIndex(0);
+        room.setLastPlayedCards(new ArrayList<>());
+        room.setLastPlayPlayerId("");
+
+        ScriptedAiService.TurnDecision decision = service.decideTurn(room, bot);
+
+        assertEquals(ScriptedAiService.TurnDecisionType.PLAY, decision.getType());
+        assertEquals(4, decision.getCards().size());
+    }
+
+    @Test
+    void botPrefersWinningBombOverSplittingQuads() throws Exception {
+        // 回归：手牌正好是四张相同 + 一张散牌，先打散牌再打炸弹是 2 回合，
+        // 过程中不应把炸弹拆成 单/对/三带 等小牌。
+        ScriptedAiService service = createServiceWithRuleEngine();
+        GameRoom room = new GameRoom("room-bomb-finish");
+
+        Player bot = new Player("bot", true);
+        bot.setStatus("PLAYING");
+        bot.getHandCards().add(card("\u2660", "K", 11));
+        bot.getHandCards().add(card("\u2665", "K", 11));
+        bot.getHandCards().add(card("\u2663", "K", 11));
+        bot.getHandCards().add(card("\u2666", "K", 11));
+
+        Player other = new Player("other");
+        other.setStatus("PLAYING");
+        other.getHandCards().add(card("\u2660", "3", 1));
+        other.getHandCards().add(card("\u2665", "3", 1));
+        other.getHandCards().add(card("\u2663", "3", 1));
+        other.getHandCards().add(card("\u2666", "3", 1));
+        other.getHandCards().add(card("\u2660", "4", 2));
+
+        room.setPlayers(new ArrayList<>(List.of(bot, other)));
+        room.setCurrentTurnIndex(0);
+        room.setLastPlayedCards(new ArrayList<>());
+        room.setLastPlayPlayerId("");
+
+        ScriptedAiService.TurnDecision decision = service.decideTurn(room, bot);
+
+        assertEquals(ScriptedAiService.TurnDecisionType.PLAY, decision.getType());
+        assertEquals(4, decision.getCards().size(),
+                "\u6700\u540e\u4e00\u624b\u70b8\u5f39\u5e94\u6574\u624b\u6253\u51fa\u8d62\u4e0b");
+    }
+
     private ScriptedAiService createServiceWithRuleEngine() throws Exception {
         ScriptedAiService service = new ScriptedAiService();
         Field field = ScriptedAiService.class.getDeclaredField("ruleEngine");
