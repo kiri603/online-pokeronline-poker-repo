@@ -67,6 +67,7 @@ import {
   kurouAwakened,
   confirmKurouAwakenDiscard,
   skipKurouAwakenDiscard,
+  tieqiJudgeCards,
 } from "./GameBoard.js";
 
 // ====== 【核心修复 2：防脱发防白屏机制】 ======
@@ -135,6 +136,7 @@ const _exposeToHtml = {
   kurouAwakened,
   confirmKurouAwakenDiscard,
   skipKurouAwakenDiscard,
+  tieqiJudgeCards,
 };
 </script>
 

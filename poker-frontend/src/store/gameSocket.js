@@ -340,6 +340,35 @@ export const connectWebSocket = (isCreating = false) => {
         }, 1000); // 1秒后清除DOM
         break;
 
+      // ====== 【铁骑】：展示判定牌 + 播放语音；成功则 500ms 后叠加马嘶声 + 给被压制玩家飘"压制" ======
+      case "TIEQI_JUDGE": {
+        const entry = {
+          id: Date.now() + Math.random(),
+          userId: res.userId,
+          card: res.card,
+          success: res.success === true,
+          maxRedWeight: res.maxRedWeight,
+        };
+        state.tieqiJudgeCards.value.push(entry);
+        showActionText(res.userId, "铁骑", "skill");
+        playAudio("action_tieqi");
+        if (entry.success) {
+          setTimeout(() => playAudio("skill_tieqi_horse"), 500);
+          const suppressed = Array.isArray(res.suppressed) ? res.suppressed : [];
+          suppressed.forEach((uid, i) => {
+            setTimeout(() => showActionText(uid, "压制", "skill"), 300 + i * 120);
+          });
+        }
+        const ttl = entry.success ? 4000 : 3000;
+        setTimeout(() => {
+          const idx = state.tieqiJudgeCards.value.findIndex(
+            (x) => x.id === entry.id,
+          );
+          if (idx >= 0) state.tieqiJudgeCards.value.splice(idx, 1);
+        }, ttl);
+        break;
+      }
+
       case "KICKED":
         if (res.targetId === state.userId.value) {
           alert("你已被房主踢出房间！");

@@ -13,6 +13,13 @@ poker/data/*.trace.db
 # === 本地验证数据 ===
 .codex-run/
 
+# === 本地临时导出 / 缓存 ===
+stackedit-export/
+tmp_pdf_pages/
+tmp_pdf_pages_2/
+*.log
+**/__pycache__/
+
 # === IDE 忽略 ===
 .idea/
 .vscode/

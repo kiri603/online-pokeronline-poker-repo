@@ -561,6 +561,14 @@ public class GameService {
             Player player = getPlayer(room, userId);
             if (player == null || !isPlayerTurn(room, userId)) return false;
 
+            // ====== 【防御】：清除上一次铁骑判定可能残留的 settings ======
+            // 若上一次出牌来自 Bot 通道但未能广播/消费 tieqi 字段，会被本次出牌误读。
+            room.getSettings().remove("tieqiJudgeCard");
+            room.getSettings().remove("tieqiJudgeUserId");
+            room.getSettings().remove("tieqiJudgeSuccess");
+            room.getSettings().remove("tieqiMaxRedWeight");
+            room.getSettings().remove("tieqiSuppressed");
+
             // ====== 提取当前玩家是否处于被借刀状态 ======
             boolean isJdsrTarget = room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"));
 
@@ -634,14 +642,11 @@ public class GameService {
                     room.setCurrentTurnStartTime(System.currentTimeMillis());
 
                     // ====== 【核心修复】：借刀作为最后一张牌打出时，立即获胜 ======
+                    // 【进一步修复】：不再把"剩余 PLAYING 玩家"一并提升为 WON。
+                    // 发起人本人已经获胜，真正还在场上的对手（= 被借刀的替身）依然是 PLAYING，
+                    // 否则 2 人局会让替身也误标成 WON，结算时可能挑错赢家。
                     if (player.getHandCards().isEmpty()) {
                         player.setStatus("WON");
-                        long aliveCount = room.getPlayers().stream().filter(p -> "PLAYING".equals(p.getStatus())).count();
-                        if (aliveCount <= 1) {
-                            for (Player p : room.getPlayers()) {
-                                if ("PLAYING".equals(p.getStatus())) p.setStatus("WON");
-                            }
-                        }
                     }
                     return true;
                 }
@@ -793,14 +798,127 @@ public class GameService {
                 }
             }
 
+            // ====== 【铁骑】：出牌含红色牌时自动判定 ======
+            log.info("[TIEQI-DEBUG] 玩家 [{}] 出牌完成, skill={}, 牌={}",
+                    userId, player.getSkill(),
+                    playedCards.stream()
+                            .map(c -> c.getSuit() + c.getRank())
+                            .toList());
+            if ("TIEQI".equals(player.getSkill())) {
+                triggerTieqi(room, player, playedCards);
+            }
+
             nextTurn(room);
             return true;
+        }
+    }
+
+    /**
+     * 铁骑「红色」判定辅助：♥、♦ 以及大王（JOKER·大王）均视为红色。
+     * 小王不算红色，不会触发判定也不会作为成功判定牌。
+     */
+    private static boolean isRedForTieqi(Card c) {
+        if (c == null || c.getSuit() == null) return false;
+        if ("\u2665".equals(c.getSuit()) || "\u2666".equals(c.getSuit())) return true;
+        return "JOKER".equals(c.getSuit()) && "\u5927\u738b".equals(c.getRank());
+    }
+
+    /**
+     * 【铁骑】被动判定：当出牌包含「红色」牌时，从牌堆顶抽一张判定牌。
+     * 红色定义：♥ (U+2665) / ♦ (U+2666) / 大王（JOKER·大王，视为红色）。
+     * 判定条件：判定牌为红色且 weight 严格小于本次出牌中最大红色 weight → 成功。
+     * 无论成败，判定牌一律进入弃牌堆；成功则在 settings 中写入 tieqiSkipRound 标记，
+     * 后续 nextTurn 会清空桌面、跳回发动者；其他玩家视为被「压制」，各罚摸 2 张。
+     */
+    private void triggerTieqi(GameRoom room, Player player, List<Card> playedCards) {
+        List<Card> redCards = playedCards.stream()
+                .filter(GameService::isRedForTieqi)
+                .toList();
+        if (redCards.isEmpty()) {
+            // 纯黑色 / 小王 / 锦囊出牌：不触发铁骑
+            return;
+        }
+        int maxRedWeight = redCards.stream().mapToInt(Card::getWeight).max().getAsInt();
+
+        Card judgeCard = drawCard(room);
+        if (judgeCard == null) {
+            log.warn("房间 [{}] 铁骑判定时牌堆与弃牌堆均空，技能视为失败", room.getRoomId());
+            return;
+        }
+        room.getDiscardPile().add(judgeCard);
+
+        // 判定牌为「红色」(♥ / ♦ / 大王) 且 weight 严格小于本次出牌中最大红色 weight → 成功
+        boolean success = isRedForTieqi(judgeCard) && judgeCard.getWeight() < maxRedWeight;
+
+        room.getSettings().put("tieqiJudgeCard", judgeCard);
+        room.getSettings().put("tieqiJudgeUserId", player.getUserId());
+        room.getSettings().put("tieqiJudgeSuccess", success);
+        room.getSettings().put("tieqiMaxRedWeight", maxRedWeight);
+
+        if (success) {
+            room.getSettings().put("tieqiSkipRound", player.getUserId());
+            log.info("🐴 玩家 [{}] 铁骑判定成功！出牌={} 红牌={} 判定牌={}{} (w={}) < 最大红色 w={}",
+                    player.getUserId(),
+                    playedCards.stream().map(c -> c.getSuit() + c.getRank()).toList(),
+                    redCards.stream().map(c -> c.getSuit() + c.getRank()).toList(),
+                    judgeCard.getSuit(), judgeCard.getRank(),
+                    judgeCard.getWeight(), maxRedWeight);
+        } else {
+            log.info("🐴 玩家 [{}] 铁骑判定失败：出牌={} 红牌={} 判定牌={}{} (w={}) 最大红色 w={}",
+                    player.getUserId(),
+                    playedCards.stream().map(c -> c.getSuit() + c.getRank()).toList(),
+                    redCards.stream().map(c -> c.getSuit() + c.getRank()).toList(),
+                    judgeCard.getSuit(), judgeCard.getRank(),
+                    judgeCard.getWeight(), maxRedWeight);
         }
     }
 
     // --- 内部辅助方法 ---
 
     private void nextTurn(GameRoom room) {
+        // ====== 【铁骑 · 压制】：判定成功 → 清桌面、所有其他 PLAYING 玩家各罚摸 2 张、轮回发动者 ======
+        if (room.getSettings().containsKey("tieqiSkipRound")) {
+            String initiatorUid = (String) room.getSettings().remove("tieqiSkipRound");
+            if (room.getLastPlayedCards() != null && !room.getLastPlayedCards().isEmpty()) {
+                room.getDiscardPile().addAll(room.getLastPlayedCards());
+                room.setLastPlayedCards(new ArrayList<>());
+            }
+            room.setLastPlayPlayerId(null);
+            for (int i = 0; i < room.getPlayers().size(); i++) {
+                if (initiatorUid.equals(room.getPlayers().get(i).getUserId())) {
+                    room.setCurrentTurnIndex(i);
+                    break;
+                }
+            }
+            room.setCurrentTurnStartTime(System.currentTimeMillis());
+            Player initiator = getPlayer(room, initiatorUid);
+            if (initiator != null) {
+                initiator.setHasReplacedCardThisTurn(false);
+                initiator.setHasUsedAoeThisTurn(false);
+                initiator.setHasUsedSkillThisTurn(false);
+            }
+
+            // —— 对其他 PLAYING 玩家执行「压制」：各罚摸 2 张 ——
+            List<String> suppressed = new ArrayList<>();
+            for (Player p : room.getPlayers()) {
+                if (p.getUserId().equals(initiatorUid)) continue;
+                if (!"PLAYING".equals(p.getStatus())) continue;
+                for (int i = 0; i < 2; i++) {
+                    Card c = drawCard(room);
+                    if (c != null) p.getHandCards().add(c);
+                }
+                checkOverloadAndWin(room, p);
+                suppressed.add(p.getUserId());
+            }
+            if (!suppressed.isEmpty()) {
+                room.getSettings().put("tieqiSuppressed", suppressed);
+            }
+
+            log.info("🐴 铁骑·压制：其他 {} 名玩家各摸 2 张，轮回发动者 [{}]，受压制玩家={}",
+                    suppressed.size(), initiatorUid, suppressed);
+            return;
+        }
+
         int nextIndex = (room.getCurrentTurnIndex() + 1) % room.getPlayers().size();
 
         // 跳过已经淘汰或获胜的玩家
@@ -1481,11 +1599,17 @@ public class GameService {
         if (player.getHandCards().isEmpty() && "PLAYING".equals(player.getStatus())) {
             player.setStatus("WON");
         }
-        long aliveCount = room.getPlayers().stream()
-                .filter(p -> "PLAYING".equals(p.getStatus())).count();
-        if (aliveCount <= 1) {
-            for (Player p : room.getPlayers()) {
-                if ("PLAYING".equals(p.getStatus())) p.setStatus("WON");
+        // 【修复】：仅在"尚无胜者"时才做最后存活者兜底；
+        // 否则 2 人局中，发动者因觉醒弃黑清空手牌获胜后，对手也会被错误升级为 WON，
+        // 导致 publishWinnerIfNeeded / recordCompletedGame 用 findFirst() 选出错误的赢家。
+        boolean hasWinner = room.getPlayers().stream().anyMatch(p -> "WON".equals(p.getStatus()));
+        if (!hasWinner) {
+            long aliveCount = room.getPlayers().stream()
+                    .filter(p -> "PLAYING".equals(p.getStatus())).count();
+            if (aliveCount <= 1) {
+                for (Player p : room.getPlayers()) {
+                    if ("PLAYING".equals(p.getStatus())) p.setStatus("WON");
+                }
             }
         }
         boolean gameEnded = room.getPlayers().stream().anyMatch(p -> "WON".equals(p.getStatus()));

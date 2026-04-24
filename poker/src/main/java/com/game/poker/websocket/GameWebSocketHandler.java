@@ -365,6 +365,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                                 String handJson = objectMapper.writeValueAsString(p.getHandCards());
                                 sendToUser(roomId, userId, new TextMessage("{\"event\": \"SYNC_HAND\", \"cards\": " + handJson + "}"));
                             }
+
+                            // ====== 【铁骑】：若本次出牌触发了判定，广播 TIEQI_JUDGE 事件 ======
+                            broadcastTieqiJudgeIfAny(roomId);
+
                             if (p != null && "WON".equals(p.getStatus())) {
                                 publishWinnerIfNeeded(roomId, isAoe ? List.of() : playedCards);
                             }
@@ -723,6 +727,34 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 }
             }
         }
+    }
+
+    /**
+     * 若本次出牌触发了铁骑判定，把结果广播给房间并清理 room.settings 中的临时字段。
+     * 无论人类玩家通道（PLAY_CARD 分支）还是 Bot 出牌通道（handleBotPlay）都必须调用，
+     * 否则残留字段会被下一次出牌误读（曾引发 "借刀杀人触发铁骑判定" 的假象）。
+     */
+    private void broadcastTieqiJudgeIfAny(String roomId) throws Exception {
+        GameRoom postRoom = gameService.getRoom(roomId);
+        if (postRoom == null || !postRoom.getSettings().containsKey("tieqiJudgeCard")) {
+            return;
+        }
+        Card tieqiCard = (Card) postRoom.getSettings().remove("tieqiJudgeCard");
+        String tieqiUid = (String) postRoom.getSettings().remove("tieqiJudgeUserId");
+        boolean tieqiSuccess = Boolean.TRUE.equals(postRoom.getSettings().remove("tieqiJudgeSuccess"));
+        Object maxWObj = postRoom.getSettings().remove("tieqiMaxRedWeight");
+        int tieqiMaxW = maxWObj instanceof Integer ? (Integer) maxWObj : 0;
+        @SuppressWarnings("unchecked")
+        List<String> suppressed = (List<String>) postRoom.getSettings().remove("tieqiSuppressed");
+        if (suppressed == null) suppressed = java.util.Collections.emptyList();
+        String tieqiCardJson = objectMapper.writeValueAsString(tieqiCard);
+        String suppressedJson = objectMapper.writeValueAsString(suppressed);
+        broadcastToRoom(roomId, new TextMessage(
+                "{\"event\":\"TIEQI_JUDGE\",\"userId\":\"" + tieqiUid + "\"," +
+                "\"card\":" + tieqiCardJson + "," +
+                "\"success\":" + tieqiSuccess + "," +
+                "\"maxRedWeight\":" + tieqiMaxW + "," +
+                "\"suppressed\":" + suppressedJson + "}"));
     }
     // --- 新增：仅向指定玩家定向发送消息（保护手牌隐私） ---
     private void sendToUser(String roomId, String userId, TextMessage message) throws Exception {
@@ -1204,6 +1236,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 "{\"event\": \"CARDS_PLAYED\", \"userId\": \"" + bot.getUserId() + "\", \"cards\": " + cardsJson + "}"
         ));
         syncPlayerHand(roomId, bot.getUserId());
+        // ====== 【铁骑】：紧急出牌同样需要广播判定（避免残留误读） ======
+        broadcastTieqiJudgeIfAny(roomId);
         publishWinnerIfNeeded(roomId, emergencyPlay);
         broadcastGameState(roomId);
 
@@ -1327,6 +1361,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         BotEmojiScenario emojiScenario = determineBotPlayEmojiScenario(playedCards, bot);
         syncPlayerHand(roomId, bot.getUserId());
+        // ====== 【铁骑】：AI 出牌若触发判定，同样广播 TIEQI_JUDGE（避免残留误读） ======
+        broadcastTieqiJudgeIfAny(roomId);
         publishWinnerIfNeeded(roomId, isAoe ? List.of() : playedCards);
         broadcastGameState(roomId);
         if (emojiScenario != null) {

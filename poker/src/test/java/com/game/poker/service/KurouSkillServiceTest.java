@@ -239,6 +239,71 @@ class KurouSkillServiceTest {
     }
 
     @Test
+    void awakenDiscardEmptyingHandOnlyMarksSelfAsWinner() {
+        // 回归：他人使用苦肉觉醒弃黑把最后一张牌丢掉获胜时，
+        // 不应该因为"唯一存活玩家"兜底逻辑而把对手也误升为 WON。
+        // 否则 publishWinnerIfNeeded / recordCompletedGame 用 findFirst()
+        // 会根据 players 列表顺序挑出错误的赢家，胜利结算显示和实际不一致。
+        GameService service = new GameService();
+        GameRoom room = makeRoom(service);
+        Player me = room.getPlayers().get(0);
+        Player foe = room.getPlayers().get(1);
+
+        me.setSkill("KUROU");
+        me.setKurouAwakened(true);
+        me.setKurouPendingAwakenDiscard(true);
+        room.setCurrentAoeType("KUROU_AWAKEN_DISCARD");
+        room.getPendingAoePlayers().add(ME);
+        room.setCurrentTurnIndex(0);
+
+        Card lastBlack = Card.getCard("\u2660", "8", 6);
+        me.getHandCards().add(lastBlack);
+
+        // 对手还有手牌、仍 PLAYING，绝不该被判负也不该被判赢
+        foe.getHandCards().add(Card.getCard("\u2665", "4", 2));
+        foe.getHandCards().add(Card.getCard("\u2666", "5", 3));
+        assertEquals("PLAYING", foe.getStatus());
+
+        service.kurouAwakenDiscard(ROOM_ID, ME, lastBlack);
+
+        assertEquals("WON", me.getStatus());
+        assertEquals("PLAYING", foe.getStatus());
+
+        // 胜者唯一：任何按 "WON" 过滤的查询都只能返回发动者本人
+        List<Player> winners = room.getPlayers().stream()
+                .filter(p -> "WON".equals(p.getStatus()))
+                .toList();
+        assertEquals(1, winners.size());
+        assertEquals(ME, winners.get(0).getUserId());
+    }
+
+    @Test
+    void awakenDiscardEmptyingHandStillPromotesSoleSurvivor() {
+        // 另一条分支：如果对手本来就因为爆牌淘汰，发动者打空手牌照常获胜，
+        // 并不会影响已经 LOST 的对手状态。
+        GameService service = new GameService();
+        GameRoom room = makeRoom(service);
+        Player me = room.getPlayers().get(0);
+        Player foe = room.getPlayers().get(1);
+
+        me.setSkill("KUROU");
+        me.setKurouAwakened(true);
+        me.setKurouPendingAwakenDiscard(true);
+        room.setCurrentAoeType("KUROU_AWAKEN_DISCARD");
+        room.getPendingAoePlayers().add(ME);
+        room.setCurrentTurnIndex(0);
+
+        Card lastBlack = Card.getCard("\u2663", "9", 7);
+        me.getHandCards().add(lastBlack);
+        foe.setStatus("LOST");
+
+        service.kurouAwakenDiscard(ROOM_ID, ME, lastBlack);
+
+        assertEquals("WON", me.getStatus());
+        assertEquals("LOST", foe.getStatus());
+    }
+
+    @Test
     void awakenDiscardConsumesSelectedBlackCard() {
         GameService service = new GameService();
         GameRoom room = makeRoom(service);

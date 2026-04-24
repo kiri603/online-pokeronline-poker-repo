@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class ScriptedAiService {
-    private static final List<String> BOT_SKILLS = List.of("ZHIHENG", "LUANJIAN", "GUANXING", "GUSHOU", "KUROU");
+    private static final List<String> BOT_SKILLS = List.of("ZHIHENG", "LUANJIAN", "GUANXING", "GUSHOU", "KUROU", "TIEQI");
 /*
 
     private static final String SUIT_SPADE = "♠";

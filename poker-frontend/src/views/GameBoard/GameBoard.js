@@ -41,6 +41,7 @@ import {
   luanjianInitiator, // <--- 确保只有这一个是新增的
   kurouUseCount,
   kurouAwakened,
+  tieqiJudgeCards,
 } from "@/store/gameState.js";
 import { computed } from "vue";
 import { soundStatus, toggleSound, playBGM } from "@/store/audioManager.js";
@@ -299,4 +300,5 @@ export {
   kurouAwakened,
   confirmKurouAwakenDiscard,
   skipKurouAwakenDiscard,
+  tieqiJudgeCards,
 };

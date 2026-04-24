@@ -309,6 +309,106 @@
   animation: flyToCenterOther 1s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
 }
 
+/* ====== 【铁骑】判定牌展示层 ====== */
+.tieqi-judge-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 600;
+}
+.tieqi-judge-card {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  width: 150px;
+  min-height: 215px;
+  padding: 12px 10px;
+  border-radius: 14px;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  background: linear-gradient(160deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.85));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: tieqiJudgeReveal 2.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  perspective: 800px;
+}
+.tieqi-judge-card.tieqi-success {
+  border: 3px solid #f39c12;
+  box-shadow:
+    0 0 30px rgba(243, 156, 18, 0.85),
+    0 0 60px rgba(211, 84, 0, 0.45);
+}
+.tieqi-judge-card.tieqi-fail {
+  border: 3px solid #7f8c8d;
+  box-shadow: 0 0 20px rgba(127, 140, 141, 0.35);
+  filter: grayscale(0.35);
+}
+.tieqi-judge-banner {
+  font-size: 18px;
+  font-weight: 900;
+  color: #f5d76e;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+.tieqi-judge-img {
+  width: 100px;
+  height: 145px;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+  background: #fff;
+}
+.tieqi-judge-fallback {
+  font-size: 12px;
+  color: #bdc3c7;
+  display: none;
+}
+.tieqi-judge-img[src=""],
+.tieqi-judge-img:not([src]) {
+  display: none;
+}
+.tieqi-judge-img[src=""] + .tieqi-judge-fallback,
+.tieqi-judge-img:not([src]) + .tieqi-judge-fallback {
+  display: block;
+}
+.tieqi-judge-label {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  text-align: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.tieqi-judge-card.tieqi-success .tieqi-judge-label {
+  background: linear-gradient(90deg, #e67e22, #f39c12);
+}
+.tieqi-judge-card.tieqi-fail .tieqi-judge-label {
+  background: rgba(127, 140, 141, 0.8);
+}
+@keyframes tieqiJudgeReveal {
+  0% {
+    transform: translate(-50%, -50%) scale(0.35) rotateY(180deg);
+    opacity: 0;
+  }
+  18% {
+    transform: translate(-50%, -50%) scale(1.18) rotateY(0deg);
+    opacity: 1;
+  }
+  30% {
+    transform: translate(-50%, -50%) scale(1) rotateY(0deg);
+  }
+  78% {
+    transform: translate(-50%, -50%) scale(1) rotateY(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -58%) scale(0.8) rotateY(0deg);
+    opacity: 0;
+  }
+}
+
 /* ====== 表情包与动作特效 ====== */
 .emoji-sidebar {
   position: absolute;
@@ -874,6 +974,14 @@
 .kurou-card:hover {
   border-color: #c0392b;
   box-shadow: 0 15px 40px rgba(192, 57, 43, 0.35);
+}
+.tieqi-card:hover {
+  border-color: #d35400;
+  box-shadow: 0 15px 40px rgba(211, 84, 0, 0.4);
+}
+.tieqi-card h3 {
+  color: #f39c12;
+  text-shadow: 0 0 10px rgba(243, 156, 18, 0.6);
 }
 .skill-card:hover {
   transform: translateY(-15px) scale(1.02);

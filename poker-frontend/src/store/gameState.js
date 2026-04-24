@@ -54,6 +54,8 @@ export const aoeStartTime = ref(0);
 export const aoeInitiator = ref("");
 export const luanjianInitiator = ref("");
 export const aoeAnimCards = ref([]);
+// ====== 【铁骑】：判定牌动画列表（中央展示判定牌 2~3 秒） ======
+export const tieqiJudgeCards = ref([]);
 
 export const serverTimeOffset = ref(0);
 export const currentTurnStartTime = ref(0);

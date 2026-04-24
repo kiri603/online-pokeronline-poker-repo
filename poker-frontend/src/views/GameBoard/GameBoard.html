@@ -114,7 +114,7 @@
     >
       <p class="table-hint art-text-kurou">
         {{ pendingAoePlayers[0] === userId ? '你' : pendingAoePlayers[0]
-        }}：苦肉·觉醒，正在弃牌...
+        }}：正在弃牌...
       </p>
     </div>
 
@@ -202,7 +202,7 @@
           ⏰ {{ countdown }}s
         </div>
         <span class="aoe-hint">
-          苦肉·觉醒：可弃置 1 张黑色牌（♠/♣/小王），或跳过
+          苦肉·觉醒：可弃置 1 张黑色牌，或跳过
         </span>
         <button @click="skipKurouAwakenDiscard" class="pass-btn">跳过</button>
         <button
@@ -222,7 +222,7 @@
         </button>
       </div>
       <div v-else class="wait-text" style="color: #e74c3c">
-        ⏳ 正在等待 {{ pendingAoePlayers[0] }} 觉醒弃牌...
+        ⏳ 正在等待 {{ pendingAoePlayers[0] }} 弃牌...
       </div>
     </template>
 
@@ -267,7 +267,7 @@
           ⏰ {{ countdown }}s
         </div>
         <button
-          v-if="mySkill !== 'GUANXING' && !(mySkill === 'KUROU' && jdsrTarget === userId)"
+          v-if="mySkill !== 'GUANXING' && mySkill !== 'TIEQI' && !(mySkill === 'KUROU' && jdsrTarget === userId)"
           @click="replaceCard"
           :class="mySkill === 'KUROU' ? 'kurou-btn' : ''"
           :disabled="
@@ -316,6 +316,28 @@
     >
       <img v-if="anim.userId === userId" :src="getCardImageUrl(anim.card)" />
       <img v-else src="/images/Background.png" />
+    </div>
+  </div>
+
+  <!-- ====== 【铁骑】：判定牌展示层 ====== -->
+  <div class="tieqi-judge-layer">
+    <div
+      v-for="j in tieqiJudgeCards"
+      :key="j.id"
+      class="tieqi-judge-card"
+      :class="j.success ? 'tieqi-success' : 'tieqi-fail'"
+    >
+      <div class="tieqi-judge-banner">🐴 铁骑</div>
+      <img
+        :src="getCardImageUrl(j.card)"
+        :alt="j.card.suit + j.card.rank"
+        class="tieqi-judge-img"
+        @error="handleImageError"
+      />
+      <div class="tieqi-judge-fallback">
+        {{ j.card.suit }}{{ j.card.rank }}
+      </div>
+      <div v-if="j.success" class="tieqi-judge-label">强制要不起！</div>
     </div>
   </div>
 
@@ -462,7 +484,15 @@
         <h3>💔 苦肉</h3>
         <p>
           出牌阶段无限次，弃置 2 张手牌并摸 4 张牌。累计使用 3
-          次永久觉醒：此后每次主动打出普通牌型后，可额外弃置一张黑色牌。
+          次永久觉醒：此后每次主动打出普通牌后，可额外弃置一张黑色牌。
+        </p>
+      </div>
+
+      <div class="skill-card tieqi-card" @click="selectSkill('TIEQI')">
+        <h3>🐴 铁骑</h3>
+        <p>
+          打出含红色牌的普通牌型时，亮出牌堆顶一张判定牌。若花色为红桃 ♥
+          且点数小于等于本次出牌最大红色牌，此次出牌无人能响应，其他人强制要不起。
         </p>
       </div>
     </div>
