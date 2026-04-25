@@ -499,6 +499,13 @@
   padding: 0 clamp(16px, 3vw, 40px);
   width: 100%;
   box-sizing: border-box;
+  /* 手牌重叠度动态计算所需变量（:style 中注入 --hand-count） */
+  --hand-card-w: 100px;
+  --hand-pad: 80px;
+  --hand-step: calc(
+    (100vw - var(--hand-pad) - var(--hand-card-w)) /
+      max(var(--hand-count, 1) - 1, 1)
+  );
 }
 
 .hand-cards-container::before {
@@ -511,18 +518,33 @@
   z-index: -1;
 }
 
-/* 右侧声音 + 剩牌竖排 */
+/* 手牌卡牌：使用 clamp 动态重叠。上限 = "舒适" 间距（与旧行为一致），
+   下限 = 最大允许重叠，保证卡牌仍可辨识。 */
+.gb-hand > .card,
+.hand-cards-container > .card {
+  margin-left: clamp(-76px, calc(var(--hand-step) - var(--hand-card-w)), -60px);
+}
+
+.gb-hand > .card:first-child,
+.hand-cards-container > .card:first-child {
+  margin-left: 0;
+}
+
+/* 右侧声音 + 剩牌竖排：viewport 固定，不随手牌容器布局/滚动移动。
+   bottom 定位使其贴近手牌区的竖直中心，避免与表情侧栏（viewport 右侧中线）重叠。 */
 .right-side-controls,
 .gb-right-side-controls {
-  position: absolute;
+  position: fixed;
   right: clamp(10px, 1.4vw, 20px);
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
+  top: auto;
+  transform: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  z-index: 100;
+  z-index: 120;
+  pointer-events: auto;
 }
 
 /* ----- 对战界面音量按钮（与 Lobby / WaitingRoom 同款 dark+gold 风格） ----- */
@@ -2378,6 +2400,21 @@
     font-size: 18px;
   }
 
+  .gb-hand,
+  .hand-cards-container {
+    --hand-card-w: 80px;
+    --hand-pad: 60px;
+  }
+
+  .gb-hand > .card,
+  .hand-cards-container > .card {
+    margin-left: clamp(
+      -60px,
+      calc(var(--hand-step) - var(--hand-card-w)),
+      -48px
+    );
+  }
+
   .card.mini,
   .mini-card {
     width: 64px;
@@ -2520,8 +2557,8 @@
     transform: scale(0.62);
   }
 
-  /* 卡牌整体缩放：手机端适当放大，提高可读性；
-     多牌时靠 overflow-x:auto 允许水平滑动 */
+  /* 卡牌整体缩放：手机端适当放大，提高可读性。
+     手牌不再横向滚动，改用动态重叠度容纳所有牌。 */
   .card {
     width: 64px;
     height: 90px;
@@ -2529,6 +2566,21 @@
     font-size: 15px;
     border-radius: 6px;
     flex-shrink: 0;
+  }
+
+  .gb-hand,
+  .hand-cards-container {
+    --hand-card-w: 64px;
+    --hand-pad: 24px;
+  }
+
+  .gb-hand > .card,
+  .hand-cards-container > .card {
+    margin-left: clamp(
+      -52px,
+      calc(var(--hand-step) - var(--hand-card-w)),
+      -36px
+    );
   }
 
   .card.selected {
@@ -2550,25 +2602,15 @@
     margin-left: -24px;
   }
 
-  /* 手牌区：贴底，预留安全区 + 右侧空间给音量/剩牌胸牌，左侧为退出键保留；
-     牌多时可横向滑动查看 */
+  /* 手牌区：贴底，预留安全区。音量/剩牌胸牌改为视口固定（独立于手牌），
+     手牌不再横向滚动，依靠动态重叠度容纳所有牌 */
   .gb-hand,
   .hand-cards-container {
     flex-shrink: 0;
     height: 120px;
     margin-bottom: 0;
-    padding: 0 46px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-x: contain;
-    touch-action: pan-x;
-    scrollbar-width: none;
-  }
-
-  .gb-hand::-webkit-scrollbar,
-  .hand-cards-container::-webkit-scrollbar {
-    display: none;
+    padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
+    overflow: visible;
   }
 
   /* 动作栏：贴底（推到手牌正上方） */
@@ -2653,13 +2695,15 @@
     font-size: 10.5px;
   }
 
-  /* 右侧控件：保持竖排紧贴右边；通过给手牌容器预留右侧 padding 避免遮挡 */
+  /* 右侧控件：viewport 固定在手牌区竖直中心，与手牌解耦不会随手牌滚动/重排；
+     通过 bottom 定位避免与表情侧栏（位于视口正中右侧）重叠 */
   .right-side-controls,
   .gb-right-side-controls {
+    position: fixed;
     right: 4px;
-    top: 50% !important;
-    bottom: auto;
-    transform: translateY(-50%);
+    top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 70px);
+    transform: none;
     flex-direction: column;
     gap: 4px;
     align-items: center;
@@ -3065,17 +3109,20 @@
   .gb-hand,
   .hand-cards-container {
     height: 96px;
-    padding: 0 50px 0 12px;
+    padding: 0 12px 0 12px;
     margin-bottom: 6px;
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    overflow: visible;
+    --hand-card-w: 60px;
+    --hand-pad: 24px;
   }
 
-  .gb-hand::-webkit-scrollbar,
-  .hand-cards-container::-webkit-scrollbar {
-    display: none;
+  .gb-hand > .card,
+  .hand-cards-container > .card {
+    margin-left: clamp(
+      -48px,
+      calc(var(--hand-step) - var(--hand-card-w)),
+      -32px
+    );
   }
 
   .gb-action-bar,
@@ -3111,6 +3158,13 @@
     padding: 4px 10px;
     font-size: 10.5px;
     border-radius: 8px;
+  }
+
+  /* 横屏：右侧控件压缩后贴合缩小的手牌区竖直中心 */
+  .right-side-controls,
+  .gb-right-side-controls {
+    bottom: 52px;
+    right: 2px;
   }
 
   /* 表情侧栏：稍微上移避免遮挡 */
@@ -3193,11 +3247,23 @@
     font-size: 11px;
   }
 
-  /* 窄屏手牌区：保持横向可滑动、牌面放大 */
+  /* 窄屏手牌区：固定高度 + 动态重叠度，不再横向滚动 */
   .gb-hand,
   .hand-cards-container {
-    padding: 0 42px calc(env(safe-area-inset-bottom, 0px) + 6px) 10px;
+    padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 6px) 10px;
     height: 108px;
+    overflow: visible;
+    --hand-card-w: 58px;
+    --hand-pad: 20px;
+  }
+
+  .gb-hand > .card,
+  .hand-cards-container > .card {
+    margin-left: clamp(
+      -46px,
+      calc(var(--hand-step) - var(--hand-card-w)),
+      -34px
+    );
   }
 
   .countdown-timer {

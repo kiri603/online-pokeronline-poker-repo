@@ -529,6 +529,7 @@
   <section
     class="hand-cards-container gb-hand"
     :class="{ 'danger-pulse': warningUserId === userId }"
+    :style="{ '--hand-count': sortedHandCards.length }"
   >
     <div
       v-for="(card, index) in sortedHandCards"
@@ -560,74 +561,74 @@
     <div v-if="activeEmojis[userId]" class="emoji-bubble me">
       <img :src="`/images/emojis/${activeEmojis[userId]}`" />
     </div>
-
-    <div class="right-side-controls gb-right-side-controls">
-      <button
-        type="button"
-        class="sound-toggle-btn gb-sound-btn"
-        @click="toggleSound"
-        :class="{ 'is-muted': !soundStatus }"
-        :aria-label="soundStatus ? '静音背景音乐' : '开启背景音乐'"
-        :title="soundStatus ? '静音背景音乐' : '开启背景音乐'"
-      >
-        <!--
-          内联 SVG（与 Lobby / WaitingRoom 同步），让图标颜色可继承 currentColor，
-          摆脱 iconfont sprite 内 fill="#000000" 黑屏问题。
-        -->
-        <svg
-          v-if="soundStatus"
-          class="gb-sound-icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            fill="currentColor"
-            d="M11 5 6 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3l5 4a1 1 0 0 0 1.6-.8V5.8A1 1 0 0 0 11 5Z"
-          />
-          <path
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            d="M15.5 8.5a5 5 0 0 1 0 7"
-          />
-          <path
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            d="M19 5a10 10 0 0 1 0 14"
-          />
-        </svg>
-        <svg
-          v-else
-          class="gb-sound-icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            fill="currentColor"
-            d="M11 5 6 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3l5 4a1 1 0 0 0 1.6-.8V5.8A1 1 0 0 0 11 5Z"
-          />
-          <path
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            d="m15.5 9.5 6 6M21.5 9.5l-6 6"
-          />
-        </svg>
-        <!-- 静音状态的脉动小红点，提醒用户当前为静音 -->
-        <span class="gb-sound-mute-dot" aria-hidden="true"></span>
-      </button>
-      <div class="my-card-count-vertical gb-count-chip">
-        <span>剩</span>
-        <span>余</span>
-        <span class="num">{{ handCards.length }}</span>
-        <span>张</span>
-      </div>
-    </div>
   </section>
+
+  <div class="right-side-controls gb-right-side-controls">
+    <button
+      type="button"
+      class="sound-toggle-btn gb-sound-btn"
+      @click="toggleSound"
+      :class="{ 'is-muted': !soundStatus }"
+      :aria-label="soundStatus ? '静音背景音乐' : '开启背景音乐'"
+      :title="soundStatus ? '静音背景音乐' : '开启背景音乐'"
+    >
+      <!--
+        内联 SVG（与 Lobby / WaitingRoom 同步），让图标颜色可继承 currentColor，
+        摆脱 iconfont sprite 内 fill="#000000" 黑屏问题。
+      -->
+      <svg
+        v-if="soundStatus"
+        class="gb-sound-icon"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          fill="currentColor"
+          d="M11 5 6 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3l5 4a1 1 0 0 0 1.6-.8V5.8A1 1 0 0 0 11 5Z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          d="M15.5 8.5a5 5 0 0 1 0 7"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          d="M19 5a10 10 0 0 1 0 14"
+        />
+      </svg>
+      <svg
+        v-else
+        class="gb-sound-icon"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          fill="currentColor"
+          d="M11 5 6 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3l5 4a1 1 0 0 0 1.6-.8V5.8A1 1 0 0 0 11 5Z"
+        />
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          d="m15.5 9.5 6 6M21.5 9.5l-6 6"
+        />
+      </svg>
+      <!-- 静音状态的脉动小红点，提醒用户当前为静音 -->
+      <span class="gb-sound-mute-dot" aria-hidden="true"></span>
+    </button>
+    <div class="my-card-count-vertical gb-count-chip">
+      <span>剩</span>
+      <span>余</span>
+      <span class="num">{{ handCards.length }}</span>
+      <span>张</span>
+    </div>
+  </div>
 
   <aside class="emoji-sidebar gb-emoji-sidebar">
     <div class="emoji-panel" v-show="showEmojiPanel">

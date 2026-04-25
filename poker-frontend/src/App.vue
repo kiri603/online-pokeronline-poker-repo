@@ -8,7 +8,8 @@
         isAuthenticated &&
         authUser &&
         !authUser.guest &&
-        !showRuleDetail
+        !showRuleDetail &&
+        !gameStarted
       "
     />
 
