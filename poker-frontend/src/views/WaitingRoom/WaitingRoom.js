@@ -228,6 +228,20 @@ const inviteFromModal = async (friendUserId) => {
   await inviteFriendToRoom(friendUserId);
 };
 
+const toggleSettingsPanel = () => {
+  if (!showSettings.value && socialDrawerOpen.value) {
+    socialDrawerOpen.value = false;
+  }
+  showSettings.value = !showSettings.value;
+};
+
+const toggleFriendDrawerExclusive = async () => {
+  if (!socialDrawerOpen.value && showSettings.value) {
+    showSettings.value = false;
+  }
+  await toggleWaitingFriendDrawer();
+};
+
 export {
   showSettings,
   roomSettings,
@@ -275,4 +289,6 @@ export {
   copyFeedback,
   addAiAndClose,
   inviteFromModal,
+  toggleSettingsPanel,
+  toggleFriendDrawerExclusive,
 };

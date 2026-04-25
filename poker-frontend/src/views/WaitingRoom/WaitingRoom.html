@@ -24,7 +24,7 @@
     />
   </div>
 
-  <!-- 顶栏：左房号/ID、右音量/设置 -->
+  <!-- 顶栏：仅左侧房号 / ID（右侧按钮挪到独立锚点，避免与全局 AccountHub 重叠） -->
   <header class="wh-topbar">
     <div class="wh-topbar-left">
       <div class="wh-pill wh-pill--accent">
@@ -41,65 +41,69 @@
         <span class="wh-pill-value">{{ userId }}</span>
       </div>
     </div>
-
-    <div class="wh-topbar-right">
-      <button
-        type="button"
-        class="wh-icon-btn wh-sound-btn"
-        :class="{ 'is-muted': !soundStatus }"
-        @click="toggleSound"
-        :aria-label="soundStatus ? '静音背景音乐' : '开启背景音乐'"
-      >
-        <svg
-          v-if="soundStatus"
-          class="wh-sound-icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            fill="currentColor"
-            d="M11 5 6 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3l5 4a1 1 0 0 0 1.6-.8V5.8A1 1 0 0 0 11 5Z"
-          />
-          <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M15.5 8.5a5 5 0 0 1 0 7" />
-          <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M19 5a10 10 0 0 1 0 14" />
-        </svg>
-        <svg
-          v-else
-          class="wh-sound-icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            fill="currentColor"
-            d="M11 5 6 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3l5 4a1 1 0 0 0 1.6-.8V5.8A1 1 0 0 0 11 5Z"
-          />
-          <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m15.5 9.5 6 6M21.5 9.5l-6 6" />
-        </svg>
-      </button>
-
-      <button
-        type="button"
-        class="wh-settings-btn"
-        :class="{ 'is-open': showSettings }"
-        @click="showSettings = !showSettings"
-      >
-        <svg class="wh-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-        <span>{{ showSettings ? "收起设置" : "房间设置" }}</span>
-      </button>
-
-      <button
-        v-if="canUseSocial"
-        type="button"
-        class="wh-friend-drawer-toggle"
-        @click="toggleWaitingFriendDrawer"
-      >
-        {{ socialDrawerOpen ? "收起好友" : "好友邀请" }}
-      </button>
-    </div>
   </header>
+
+  <!-- 声音按钮：与联机大厅完全同位（右上角，紧邻 AccountHub 右侧） -->
+  <div class="wh-sound-anchor">
+    <button
+      type="button"
+      class="wh-icon-btn wh-sound-btn"
+      :class="{ 'is-muted': !soundStatus }"
+      @click="toggleSound"
+      :aria-label="soundStatus ? '静音背景音乐' : '开启背景音乐'"
+    >
+      <svg
+        v-if="soundStatus"
+        class="wh-sound-icon"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          fill="currentColor"
+          d="M11 5 6 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3l5 4a1 1 0 0 0 1.6-.8V5.8A1 1 0 0 0 11 5Z"
+        />
+        <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M15.5 8.5a5 5 0 0 1 0 7" />
+        <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M19 5a10 10 0 0 1 0 14" />
+      </svg>
+      <svg
+        v-else
+        class="wh-sound-icon"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          fill="currentColor"
+          d="M11 5 6 9H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3l5 4a1 1 0 0 0 1.6-.8V5.8A1 1 0 0 0 11 5Z"
+        />
+        <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m15.5 9.5 6 6M21.5 9.5l-6 6" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- 房间设置 / 好友邀请：顶栏下方右侧，避开 AccountHub / 声音按钮 -->
+  <div class="wh-action-anchor">
+    <button
+      type="button"
+      class="wh-settings-btn"
+      :class="{ 'is-open': showSettings }"
+      @click="toggleSettingsPanel"
+    >
+      <svg class="wh-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+      <span>{{ showSettings ? "收起设置" : "房间设置" }}</span>
+    </button>
+
+    <button
+      v-if="canUseSocial"
+      type="button"
+      class="wh-friend-drawer-toggle"
+      @click="toggleFriendDrawerExclusive"
+    >
+      {{ socialDrawerOpen ? "收起好友" : "好友邀请" }}
+    </button>
+  </div>
 
   <!-- 设置浮层（顶栏下方，按钮触发） -->
   <div v-if="showSettings" class="wh-settings-panel">

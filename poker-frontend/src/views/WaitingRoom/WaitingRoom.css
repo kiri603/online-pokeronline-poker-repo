@@ -167,16 +167,17 @@
   100% { transform: translateX(0) rotate(360deg); }
 }
 
-/* ---------- 顶栏 ---------- */
+/* ---------- 顶栏（只有左侧 pill；右侧按钮改为独立锚点） ---------- */
 .wh-topbar {
   position: absolute;
   top: clamp(12px, 2vh, 20px);
   left: clamp(14px, 2vw, 26px);
-  right: clamp(14px, 2vw, 26px);
+  /* 右侧留给 AccountHub + 声音锚点，避免重叠 */
+  right: clamp(140px, 14vw, 200px);
   z-index: 20;
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   pointer-events: none;
 }
@@ -191,12 +192,29 @@
   flex-wrap: wrap;
 }
 
-.wh-topbar-right {
+/* ---------- 声音按钮锚点（与 Lobby .lobby-top-right 同位） ---------- */
+.wh-sound-anchor {
+  position: absolute;
+  top: clamp(16px, 2vh, 22px);
+  right: clamp(16px, 1.8vw, 22px);
+  z-index: 20;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
   align-items: center;
+  gap: 10px;
+}
+
+/* ---------- 房间设置 / 好友邀请锚点（顶栏下方右侧） ---------- */
+.wh-action-anchor {
+  position: absolute;
+  /* 紧贴声音按钮（40px）+ AccountHub 下方，留 12px 间距 */
+  top: calc(clamp(16px, 2vh, 22px) + 40px + 12px);
+  right: clamp(16px, 1.8vw, 22px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+  pointer-events: auto;
 }
 
 /* ---------- 顶栏 pill（房间号 / 我的ID） ---------- */
@@ -394,11 +412,12 @@
   );
 }
 
-/* ---------- 设置浮层 ---------- */
+/* ---------- 设置浮层（紧贴 .wh-action-anchor 下方） ---------- */
 .wh-settings-panel {
   position: absolute;
-  top: calc(clamp(12px, 2vh, 20px) + 52px);
-  right: clamp(14px, 2vw, 26px);
+  /* action-anchor 顶 = 16+40+12=68px，其内按钮 40px 高 → 面板顶 = 16+40+12+40+8 */
+  top: calc(clamp(16px, 2vh, 22px) + 40px + 12px + 40px + 8px);
+  right: clamp(16px, 1.8vw, 22px);
   z-index: 60;
   width: min(280px, calc(100vw - 32px));
   padding: 16px 16px 14px;
@@ -507,12 +526,13 @@
   cursor: not-allowed;
 }
 
-/* ---------- 好友抽屉 ---------- */
+/* ---------- 好友抽屉（与 .wh-settings-panel 同位置，互斥显示） ---------- */
 .wh-friend-drawer {
   position: absolute;
-  top: calc(clamp(12px, 2vh, 20px) + 52px);
-  right: clamp(14px, 2vw, 26px);
-  z-index: 55;
+  /* 与 .wh-settings-panel 对齐：action-anchor 顶 + 按钮 40px + 8px 间距 */
+  top: calc(clamp(16px, 2vh, 22px) + 40px + 12px + 40px + 8px);
+  right: clamp(16px, 1.8vw, 22px);
+  z-index: 60;
   width: min(300px, calc(100vw - 32px));
   padding: 14px;
   border-radius: 16px;
@@ -1707,14 +1727,15 @@
       );
   }
 
-  /* 顶栏：单行紧凑 */
+  /* 顶栏：仅左侧 pill，右侧腾出给声音按钮 / AccountHub */
   .wh-topbar {
     flex-direction: row;
     align-items: center;
     flex-wrap: nowrap;
     top: max(8px, env(safe-area-inset-top));
     left: 10px;
-    right: 10px;
+    /* 右侧：sound 34px + AccountHub ~88px（仅注册用户显示）+ 10px 间距 */
+    right: 52px;
     gap: 6px;
   }
 
@@ -1726,10 +1747,18 @@
     overflow: hidden;
   }
 
-  .wh-topbar-right {
-    gap: 6px;
-    flex-wrap: nowrap;
-    flex-shrink: 0;
+  /* 声音按钮锚点：与 Lobby 手机端同位（34x34，right:10, top:10） */
+  .wh-sound-anchor {
+    top: max(10px, env(safe-area-inset-top));
+    right: 10px;
+    gap: 8px;
+  }
+
+  /* 房间设置 / 好友邀请锚点：声音按钮下方，贴右 */
+  .wh-action-anchor {
+    top: calc(max(10px, env(safe-area-inset-top)) + 34px + 8px);
+    right: 10px;
+    gap: 8px;
   }
 
   .wh-pill {
@@ -1762,23 +1791,23 @@
   }
 
   .wh-icon-btn {
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 34px;
   }
 
   .wh-icon-btn .wh-sound-icon {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
   }
 
   .wh-settings-btn,
   .wh-friend-drawer-toggle {
-    height: 28px;
+    height: 30px;
     font-size: 11px;
-    padding: 0 9px;
+    padding: 0 11px;
     letter-spacing: 1px;
     gap: 4px;
-    border-radius: 14px;
+    border-radius: 15px;
   }
 
   .wh-settings-icon {
@@ -2054,7 +2083,8 @@
 
   .wh-settings-panel,
   .wh-friend-drawer {
-    top: 44px;
+    /* 声音锚点 10 + 34 + 8 + 设置按钮 30 + 6 = 88 */
+    top: 88px;
     right: 10px;
     left: 10px;
     width: auto;

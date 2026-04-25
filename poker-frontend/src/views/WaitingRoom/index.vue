@@ -47,6 +47,8 @@ import {
   copyFeedback,
   addAiAndClose,
   inviteFromModal,
+  toggleSettingsPanel,
+  toggleFriendDrawerExclusive,
 } from "./WaitingRoom.js";
 
 const waitingRoomIsOwner = isOwner;
@@ -109,6 +111,8 @@ const _exposeToHtml = {
   copyFeedback,
   addAiAndClose,
   inviteFromModal,
+  toggleSettingsPanel,
+  toggleFriendDrawerExclusive,
 };
 </script>
 
