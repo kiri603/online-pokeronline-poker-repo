@@ -153,7 +153,28 @@
 
   <!-- 好友邀请侧抽屉（保留原入口） -->
   <div v-if="canUseSocial && socialDrawerOpen" class="wh-friend-drawer">
-    <div class="wh-friend-drawer-title">在线好友</div>
+    <div class="wh-friend-drawer-head">
+      <div class="wh-friend-drawer-title">在线好友</div>
+      <button
+        type="button"
+        class="wh-friend-drawer-close"
+        aria-label="关闭好友抽屉"
+        @click="toggleFriendDrawerExclusive"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M18 6L6 18" />
+          <path d="M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
     <div v-if="waitingRoomFriendList.length === 0" class="wh-friend-drawer-empty">
       暂时没有在线好友可以邀请
     </div>

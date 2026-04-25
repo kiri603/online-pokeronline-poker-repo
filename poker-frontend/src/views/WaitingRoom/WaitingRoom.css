@@ -526,11 +526,15 @@
   cursor: not-allowed;
 }
 
-/* ---------- 好友抽屉（与 .wh-settings-panel 同位置，互斥显示） ---------- */
+/* ---------- 好友抽屉（与 .wh-settings-panel 互斥显示） ---------- */
 .wh-friend-drawer {
   position: absolute;
-  /* 与 .wh-settings-panel 对齐：action-anchor 顶 + 按钮 40px + 8px 间距 */
-  top: calc(clamp(16px, 2vh, 22px) + 40px + 12px + 40px + 8px);
+  /* ⚠️ 必须落在「房间设置」+「好友邀请」两个按钮的下方
+     如果按 .wh-settings-panel 那样只压在「房间设置」下，
+     抽屉会直接盖住自己的触发按钮「好友邀请」，
+     用户就没办法再点同一个按钮关闭抽屉。
+     公式：sound-anchor(22) + sound(40) + gap(12) + 设置(40) + gap(10) + 好友(40) + gap(8) */
+  top: calc(clamp(16px, 2vh, 22px) + 40px + 12px + 40px + 10px + 40px + 8px);
   right: clamp(16px, 1.8vw, 22px);
   z-index: 60;
   width: min(300px, calc(100vw - 32px));
@@ -542,12 +546,55 @@
   animation: whSlideDown 220ms ease-out;
 }
 
+/* 抽屉头部：标题 + 关闭按钮 */
+.wh-friend-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .wh-friend-drawer-title {
   font-family: "Noto Serif SC", serif;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--wh-gold-bright);
+}
+
+.wh-friend-drawer-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 222, 138, 0.3);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff5e6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color 200ms ease-out,
+    color 200ms ease-out,
+    transform 200ms ease-out,
+    border-color 200ms ease-out;
+}
+
+.wh-friend-drawer-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--wh-gold-bright);
+  border-color: rgba(255, 214, 128, 0.7);
+  transform: scale(1.06);
+}
+
+.wh-friend-drawer-close:active {
+  transform: scale(0.94);
+}
+
+.wh-friend-drawer-close svg {
+  width: 14px;
+  height: 14px;
 }
 
 .wh-friend-drawer-empty {
@@ -1815,9 +1862,13 @@
     height: 12px;
   }
 
-  /* 主区：紧凑垂直节奏 */
+  /* 主区：紧凑垂直节奏
+     padding-top 对齐 safe-area-inset-top，确保无论有无状态栏/刘海，
+     主内容（标题 + 座位）整体与右上角「房间设置/好友邀请」按钮一起下移，
+     避免在真实手机（刘海/灵动岛/状态栏）上出现重叠错位 */
   .wh-main {
-    padding: 46px 10px max(10px, env(safe-area-inset-bottom)) 10px;
+    padding: calc(46px + env(safe-area-inset-top, 0px)) 10px
+      max(10px, env(safe-area-inset-bottom)) 10px;
     gap: 8px;
     justify-content: flex-start;
   }
@@ -1857,10 +1908,15 @@
     font-size: 12px;
   }
 
-  /* 座位面板：手机端提高不透明度 + 轻磨砂，用于遮挡左侧看板娘下半身 */
+  /* 座位面板：手机端提高不透明度 + 轻磨砂，用于遮挡左侧看板娘下半身
+     关键：margin-top 把「房间内玩家」整体下移，保证：
+     1) 右上角「房间设置 / 好友邀请」按钮（约占 52~154px 纵向区间）永远在面板上方
+     2) 看板娘的头部和胸部（图像上半部分约 170~220px）可以完整露出
+     用 clamp 而非 vh，让不同手机（iPhone 14 Pro / 红米 / 三星 等）保持一致 */
   .wh-seats {
     position: relative;
     z-index: 6;
+    margin-top: clamp(80px, 14vh, 120px);
     padding: 10px 12px 10px;
     gap: 6px;
     max-width: 100%;
@@ -2083,13 +2139,25 @@
 
   .wh-settings-panel,
   .wh-friend-drawer {
-    /* 声音锚点 10 + 34 + 8 + 设置按钮 30 + 6 = 88 */
-    top: 88px;
     right: 10px;
     left: 10px;
     width: auto;
     max-height: 60vh;
     overflow-y: auto;
+  }
+
+  /* 设置浮层：紧贴「房间设置」按钮下方
+     声音锚点 max(10, safe-inset-top) + sound 34 + 8 + 设置 30 + 6 */
+  .wh-settings-panel {
+    top: calc(max(10px, env(safe-area-inset-top)) + 34px + 8px + 30px + 6px);
+  }
+
+  /* 好友抽屉：必须避开「好友邀请」按钮，否则抽屉盖住自己的触发按钮
+     声音锚点 + sound 34 + 8 + 设置 30 + gap 8 + 好友 30 + gap 6 */
+  .wh-friend-drawer {
+    top: calc(
+      max(10px, env(safe-area-inset-top)) + 34px + 8px + 30px + 8px + 30px + 6px
+    );
   }
 }
 
