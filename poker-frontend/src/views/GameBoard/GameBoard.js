@@ -40,7 +40,11 @@ import {
   jdsrInitiator,
   luanjianInitiator, // <--- 确保只有这一个是新增的
   kurouUseCount,
+  kurouUsesThisTurn,
   kurouAwakened,
+  guixinDisabled,
+  guixinPendingPasser,
+  showGuixinModal,
   tieqiJudgeCards,
 } from "@/store/gameState.js";
 import { computed } from "vue";
@@ -136,6 +140,8 @@ const replaceCard = () => {
   } else if (mySkill.value === "GUSHOU") {
     sendMsg("USE_GUSHOU", null);
   } else if (mySkill.value === "KUROU") {
+    if (kurouUsesThisTurn.value >= 2)
+      return alert("本回合苦肉已使用 2 次！");
     if (selectedCards.value.length !== 2)
       return alert("苦肉必须选择 2 张牌！");
     const cleanCards = selectedCards.value.map((c) => ({
@@ -145,6 +151,9 @@ const replaceCard = () => {
     }));
     sendMsg("USE_SKILL", { skill: "KUROU", cards: cleanCards });
     selectedCards.value.forEach((c) => (c.selected = false));
+  } else if (mySkill.value === "GUIXIN") {
+    if (guixinDisabled.value) return alert("归心已禁用，需要保护他人要不起后解除！");
+    sendMsg("USE_SKILL", { skill: "GUIXIN" });
   }
 };
 const selectSkill = (s) => {
@@ -234,6 +243,9 @@ const skipKurouAwakenDiscard = () => {
   selectedCards.value.forEach((card) => (card.selected = false));
   sendMsg("KUROU_AWAKEN_DISCARD", null);
 };
+const confirmGuixinDecision = (accept) => {
+  sendMsg("GUIXIN_DECISION", { accept });
+};
 export {
   userId,
   otherPlayers,
@@ -297,7 +309,12 @@ export {
   jdsrInitiator,
   luanjianInitiator, // <--- 确保只有这一个是新增的
   kurouUseCount,
+  kurouUsesThisTurn,
   kurouAwakened,
+  guixinDisabled,
+  guixinPendingPasser,
+  showGuixinModal,
+  confirmGuixinDecision,
   confirmKurouAwakenDiscard,
   skipKurouAwakenDiscard,
   tieqiJudgeCards,

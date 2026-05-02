@@ -775,6 +775,7 @@
 .play-btn,
 .pass-btn,
 .kurou-btn,
+.guixin-btn,
 .return-room-btn {
   position: relative;
   display: inline-flex;
@@ -887,6 +888,26 @@
 .gb-btn--kurou:disabled {
   background: linear-gradient(180deg, #6b3a3a 0%, #4d2a2a 100%);
   color: #f1f1f1;
+  box-shadow: none;
+}
+
+.guixin-btn,
+.gb-btn--guixin {
+  background: linear-gradient(180deg, #2fbf9f 0%, #1d826f 55%, #12574c 100%);
+  border-color: rgba(175, 255, 225, 0.72);
+  color: #f4fff8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.guixin-btn:hover:not(:disabled),
+.gb-btn--guixin:hover:not(:disabled) {
+  background: linear-gradient(180deg, #46d7b7 0%, #269b82 55%, #16695a 100%);
+}
+
+.guixin-btn:disabled,
+.gb-btn--guixin:disabled {
+  background: linear-gradient(180deg, rgba(88, 113, 112, 0.82), rgba(56, 75, 76, 0.95));
+  color: #e6efef;
   box-shadow: none;
 }
 
@@ -1017,6 +1038,11 @@
     inset 0 1px 0 rgba(255, 222, 138, 0.22);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+}
+
+.guixin-action-bar {
+  background: linear-gradient(160deg, rgba(20, 76, 68, 0.88), rgba(11, 40, 43, 0.94));
+  border-color: rgba(144, 255, 226, 0.58);
 }
 
 .aoe-hint {
@@ -1926,6 +1952,11 @@
   box-shadow: 0 16px 36px rgba(192, 57, 43, 0.4);
 }
 
+.guixin-card:hover {
+  border-color: #2fbf9f;
+  box-shadow: 0 16px 36px rgba(47, 191, 159, 0.35);
+}
+
 .tieqi-card:hover {
   border-color: var(--gb-gold-primary);
   box-shadow: 0 16px 36px rgba(211, 84, 0, 0.42);
@@ -2191,6 +2222,20 @@
     1px -1px 0 #6e1616,
     -1px 1px 0 #6e1616,
     0 0 15px rgba(231, 76, 60, 0.85) !important;
+}
+
+.art-text-guixin {
+  font-family: "Ma Shan Zheng", "KaiTi", cursive !important;
+  font-size: 32px !important;
+  font-weight: 900 !important;
+  color: #d9fff2 !important;
+  letter-spacing: 3px;
+  text-shadow:
+    2px 2px 0 #14574c,
+    -1px -1px 0 #14574c,
+    1px -1px 0 #14574c,
+    -1px 1px 0 #14574c,
+    0 0 15px rgba(47, 191, 159, 0.82) !important;
 }
 
 /* ============================================================
@@ -2634,7 +2679,8 @@
   .action-bar button,
   .play-btn,
   .pass-btn,
-  .kurou-btn {
+  .kurou-btn,
+  .guixin-btn {
     min-height: 40px;
     padding: 0 14px;
     font-size: 13px;
@@ -3136,7 +3182,8 @@
   .gb-btn,
   .play-btn,
   .pass-btn,
-  .kurou-btn {
+  .kurou-btn,
+  .guixin-btn {
     min-height: 32px;
     padding: 0 12px;
     font-size: 12px;
@@ -3274,7 +3321,8 @@
   .gb-btn,
   .play-btn,
   .pass-btn,
-  .kurou-btn {
+  .kurou-btn,
+  .guixin-btn {
     min-height: 36px;
     padding: 0 10px;
     font-size: 12px;

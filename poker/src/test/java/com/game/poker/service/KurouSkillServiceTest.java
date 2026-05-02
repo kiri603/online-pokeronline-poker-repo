@@ -47,16 +47,49 @@ class KurouSkillServiceTest {
 
         assertFalse(service.useKurou(ROOM_ID, ME, twoFrom(me)));
         assertEquals(2, me.getKurouUseCount());
+        assertEquals(2, me.getKurouUsesThisTurn());
         assertFalse(me.isKurouAwakened());
 
+        me.setKurouUsesThisTurn(0);
         boolean awakenTriggered = service.useKurou(ROOM_ID, ME, twoFrom(me));
         assertEquals(3, me.getKurouUseCount());
+        assertEquals(1, me.getKurouUsesThisTurn());
         assertTrue(awakenTriggered);
         assertTrue(me.isKurouAwakened());
 
         // 第 4 次再用不会再次广播觉醒
         assertFalse(service.useKurou(ROOM_ID, ME, twoFrom(me)));
+        assertEquals(2, me.getKurouUsesThisTurn());
         assertTrue(me.isKurouAwakened());
+    }
+
+    @Test
+    void sameTurnThirdUsageIsRejectedWithoutChangingState() {
+        GameService service = new GameService();
+        GameRoom room = makeRoom(service);
+        Player me = room.getPlayers().get(0);
+
+        seedHand(me, 6);
+        fillDeck(room, 20);
+
+        service.useKurou(ROOM_ID, ME, twoFrom(me));
+        service.useKurou(ROOM_ID, ME, twoFrom(me));
+
+        int handSize = me.getHandCards().size();
+        int deckSize = room.getDeck().size();
+        int discardSize = room.getDiscardPile().size();
+        int totalUseCount = me.getKurouUseCount();
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> service.useKurou(ROOM_ID, ME, twoFrom(me)));
+
+        assertTrue(ex.getMessage().contains("2 次"));
+        assertEquals(handSize, me.getHandCards().size());
+        assertEquals(deckSize, room.getDeck().size());
+        assertEquals(discardSize, room.getDiscardPile().size());
+        assertEquals(totalUseCount, me.getKurouUseCount());
+        assertEquals(2, me.getKurouUsesThisTurn());
+        assertFalse(me.isKurouAwakened());
     }
 
     @Test

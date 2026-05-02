@@ -99,17 +99,6 @@ export const connectWebSocket = (isCreating = false) => {
     return alert("创建私密房间必须设置 4 位密码！");
   }
 
-  // ====== 【自动环境识别】：一次配置，永久生效 ======
-  // 1. 获取当前浏览器地址栏的域名或 IP
-  const currentHost = window.location.hostname;
-
-  // 2. 判断是否在本地环境运行
-  const isLocal = currentHost === "localhost" || currentHost === "127.0.0.1";
-
-  // 3. 动态决定后端的 IP 和端口
-  const serverIp = isLocal ? "localhost:8080" : "39.102.60.181:8080";
-
-  // 4. 建立连接
   const tabToken = getTabAuthToken();
   const wsUrl = tabToken
     ? `${getWsBaseUrl()}/ws/game?authToken=${encodeURIComponent(tabToken)}`
@@ -184,6 +173,8 @@ export const connectWebSocket = (isCreating = false) => {
             } else if (state.currentAoeType.value === "KUROU_AWAKEN_DISCARD") {
               // 【苦肉·觉醒】：超时自动跳过额外弃置
               sendMsg("KUROU_AWAKEN_DISCARD", null);
+            } else if (state.currentAoeType.value === "GUIXIN_DECISION") {
+              sendMsg("GUIXIN_DECISION", { accept: false });
             } else {
               sendMsg("RESPOND_AOE", null);
             } // 超时自动要不起
@@ -289,12 +280,18 @@ export const connectWebSocket = (isCreating = false) => {
           state.isReady.value = me.isReady;
           state.myStatus.value = me.status;
           if (me.skill) state.mySkill.value = me.skill;
-          // 【苦肉】：本地 me 的计数 / 觉醒态同步
+          // 【苦肉】：本地 me 的累计计数 / 本回合次数 / 觉醒态同步
           if (typeof me.kurouUseCount === "number") {
             state.kurouUseCount.value = me.kurouUseCount;
           }
+          if (typeof me.kurouUsesThisTurn === "number") {
+            state.kurouUsesThisTurn.value = me.kurouUsesThisTurn;
+          }
           if (typeof me.kurouAwakened === "boolean") {
             state.kurouAwakened.value = me.kurouAwakened;
+          }
+          if (typeof me.guixinDisabled === "boolean") {
+            state.guixinDisabled.value = me.guixinDisabled;
           }
         }
         if (res.isStarted !== undefined) {
@@ -323,9 +320,15 @@ export const connectWebSocket = (isCreating = false) => {
           // ====== 【新增：提取借刀杀人状态】 ======
           state.jdsrTarget.value = res.settings.jdsr_target || null;
           state.jdsrInitiator.value = res.settings.jdsr_initiator || null;
+          state.guixinPendingOwner.value =
+            res.settings.guixin_pending_owner || "";
+          state.guixinPendingPasser.value =
+            res.settings.guixin_pending_passer || "";
         } else {
           state.jdsrTarget.value = null;
           state.jdsrInitiator.value = null;
+          state.guixinPendingOwner.value = "";
+          state.guixinPendingPasser.value = "";
         }
         break;
 
@@ -434,9 +437,13 @@ export const connectWebSocket = (isCreating = false) => {
         state.winner.value = "";
         state.tableCards.value = [];
         state.lastPlayPlayer.value = "";
-        // 【苦肉】新开局时重置本地 me 的计数/觉醒态
+        // 【苦肉】新开局时重置本地 me 的累计计数/本回合次数/觉醒态
         state.kurouUseCount.value = 0;
+        state.kurouUsesThisTurn.value = 0;
         state.kurouAwakened.value = false;
+        state.guixinDisabled.value = false;
+        state.guixinPendingOwner.value = "";
+        state.guixinPendingPasser.value = "";
         playAudio("shuffle");
         state.isShuffling.value = true;
         setTimeout(() => {
@@ -491,6 +498,9 @@ export const connectWebSocket = (isCreating = false) => {
         state.tableCards.value = [];
         state.lastPlayPlayer.value = "";
         state.currentTurn.value = "";
+        state.guixinDisabled.value = false;
+        state.guixinPendingOwner.value = "";
+        state.guixinPendingPasser.value = "";
         playBGM("Welcome");
         break;
 
@@ -509,6 +519,10 @@ export const connectWebSocket = (isCreating = false) => {
         else if (res.aoeName === "五谷丰登") playAudio("skill_wgfd");
         else if (res.aoeName === "借刀杀人" || res.aoeName === "JDSR")
           playAudio("skill_jdsr");
+        break;
+
+      case "GUIXIN_RESOLVED":
+        if (res.accepted) showActionText(res.userId, "归心", "skill");
         break;
 
       case "ERROR":
@@ -585,6 +599,12 @@ export const connectWebSocket = (isCreating = false) => {
         } else if (res.skillName === "KUROU") {
           // ====== 【新增：苦肉全服飘字 + 语音】 ======
           showActionText(res.userId, "苦肉", "skill");
+          if (res.userId === state.userId.value) {
+            state.kurouUsesThisTurn.value = Math.min(
+              2,
+              state.kurouUsesThisTurn.value + 1,
+            );
+          }
           // 短暂延迟播放，若紧随其后收到 SKILL_AWAKEN 则跳过普通语音
           if (pendingKurouSfxTimeout) {
             clearTimeout(pendingKurouSfxTimeout);
@@ -593,6 +613,9 @@ export const connectWebSocket = (isCreating = false) => {
             pendingKurouSfxTimeout = null;
             playAudio("action_kurou");
           }, 120);
+        } else if (res.skillName === "GUIXIN") {
+          showActionText(res.userId, "归心", "skill");
+          playAudio("action_guixin");
         }
         break;
       case "SKILL_AWAKEN":
@@ -632,6 +655,9 @@ export const connectWebSocket = (isCreating = false) => {
       enableWildcard: false,
       enableScrollCards: false,
     };
+    state.guixinDisabled.value = false;
+    state.guixinPendingOwner.value = "";
+    state.guixinPendingPasser.value = "";
     if (globalTimer) clearInterval(globalTimer);
   };
 };

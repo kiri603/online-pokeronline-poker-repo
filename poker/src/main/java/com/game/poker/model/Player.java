@@ -18,9 +18,11 @@ public class Player {
     private boolean hasUsedAoeThisTurn = false;
     private String skill = "ZHIHENG";
     private boolean hasUsedSkillThisTurn = false;
+    private boolean guixinDisabled = false;
 
-    // ====== 【苦肉技能】：跨回合累计计数、觉醒态、觉醒后出牌挂起标记 ======
+    // ====== 【苦肉技能】：跨回合累计计数、本回合次数、觉醒态、觉醒后出牌挂起标记 ======
     private int kurouUseCount = 0;
+    private int kurouUsesThisTurn = 0;
     private boolean kurouAwakened = false;
     private boolean kurouPendingAwakenDiscard = false;
 
@@ -30,6 +32,14 @@ public class Player {
 
     public void setKurouUseCount(int kurouUseCount) {
         this.kurouUseCount = kurouUseCount;
+    }
+
+    public int getKurouUsesThisTurn() {
+        return kurouUsesThisTurn;
+    }
+
+    public void setKurouUsesThisTurn(int kurouUsesThisTurn) {
+        this.kurouUsesThisTurn = kurouUsesThisTurn;
     }
 
     public boolean isKurouAwakened() {
@@ -62,6 +72,14 @@ public class Player {
 
     public void setHasUsedSkillThisTurn(boolean hasUsedSkillThisTurn) {
         this.hasUsedSkillThisTurn = hasUsedSkillThisTurn;
+    }
+
+    public boolean isGuixinDisabled() {
+        return guixinDisabled;
+    }
+
+    public void setGuixinDisabled(boolean guixinDisabled) {
+        this.guixinDisabled = guixinDisabled;
     }
 
     public boolean isHasUsedAoeThisTurn() {

@@ -5,11 +5,10 @@ import path from "path";
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  // Allow a developer to override the backend target through VITE_DEV_BACKEND
-  // (e.g. VITE_DEV_BACKEND=http://127.0.0.1:8080). When unset we proxy to the
-  // public demo server so local UI testing is possible without standing up
-  // the full Java/MySQL/Redis stack.
-  const devBackend = env.VITE_DEV_BACKEND || "http://39.102.60.181:8080";
+  // Allow a developer to override the backend target through VITE_DEV_BACKEND.
+  // Local development must default to the local Spring Boot server so frontend
+  // changes and backend changes are tested against the same codebase.
+  const devBackend = env.VITE_DEV_BACKEND || "http://127.0.0.1:8080";
   const wsBackend = devBackend.replace(/^http/, "ws");
 
   return {

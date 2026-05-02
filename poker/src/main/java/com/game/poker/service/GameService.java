@@ -20,6 +20,14 @@ public class GameService {
     @Autowired(required = false) // 如果你还没有写 RuleEngine，可以先加上 required=false 防止报错
     private RuleEngine ruleEngine;
 
+    public static final String GUIXIN_DECISION = "GUIXIN_DECISION";
+    public static final String GUIXIN_SOURCE_PASS = "PASS";
+    public static final String GUIXIN_SOURCE_GUSHOU = "GUSHOU";
+    public static final String GUIXIN_SOURCE_GUANXING = "GUANXING";
+    private static final String GUIXIN_PENDING_OWNER = "guixin_pending_owner";
+    private static final String GUIXIN_PENDING_PASSER = "guixin_pending_passer";
+    private static final String GUIXIN_PENDING_SOURCE = "guixin_pending_source";
+
     private static final List<String> SCRIPTED_AI_NAMES = List.of(
             "AI\u73a9\u5bb6-\u8bf8\u845b\u4eae",
             "AI\u73a9\u5bb6-\u5218\u5907",
@@ -184,6 +192,7 @@ public class GameService {
         room.getSettings().remove("jdsr_target");
         room.getSettings().remove("jdsr_initiator");
         room.getSettings().remove("game_recorded");
+        clearGuixinPending(room);
         room.getSettings().put("game_start_time", System.currentTimeMillis());
         room.setStarted(true);
         room.setPhase("PLAYING");
@@ -220,8 +229,10 @@ public class GameService {
             player.setHasReplacedCardThisTurn(false);
             player.setHasUsedAoeThisTurn(false);
             player.setHasUsedSkillThisTurn(false);
-            // 【苦肉技能】：本局开时重置计数/觉醒/挂起态；同局内跨回合保留
+            player.setGuixinDisabled(false);
+            // 【苦肉技能】：本局开时重置计数/觉醒/挂起态；同局内跨回合保留累计计数
             player.setKurouUseCount(0);
+            player.setKurouUsesThisTurn(0);
             player.setKurouAwakened(false);
             player.setKurouPendingAwakenDiscard(false);
             // 打印每个玩家的初始手牌
@@ -437,8 +448,15 @@ public class GameService {
             log.info("玩家 [{}] 选择不出 (Pass)，触发惩罚摸 2 张牌...", userId);
 
             if ("GUANXING".equals(player.getSkill()) && !player.isHasUsedSkillThisTurn()) {
+                if (startGuixinDecision(room, userId, GUIXIN_SOURCE_GUANXING)) {
+                    return;
+                }
                 player.setHasUsedSkillThisTurn(true);
-                startGuanxing(room, userId, "PASS");
+                startGuanxing(room, userId, GUIXIN_SOURCE_PASS);
+                return;
+            }
+
+            if (startGuixinDecisionForPass(room, userId)) {
                 return;
             }
 
@@ -473,6 +491,124 @@ public class GameService {
             if (gameEnded) return;
 
             handleNextTurnAfterPass(room);
+        }
+    }
+
+    public void useGuixin(String roomId, String userId) {
+        GameRoom room = roomMap.get(roomId);
+        if (room == null) return;
+
+        synchronized (room) {
+            Player player = getPlayer(room, userId);
+            if (player == null || !isPlayerTurn(room, userId)) {
+                throw new RuntimeException("非本人回合，无法使用归心！");
+            }
+            if (!"PLAYING".equals(player.getStatus())) {
+                throw new RuntimeException("当前状态无法使用归心！");
+            }
+            if (!"GUIXIN".equals(player.getSkill())) {
+                throw new RuntimeException("未选择归心技能！");
+            }
+            if (player.isGuixinDisabled()) {
+                throw new RuntimeException("归心已禁用，需要保护他人要不起后解除！");
+            }
+            if (room.getCurrentAoeType() != null) {
+                throw new RuntimeException("当前结算中，无法使用归心！");
+            }
+            if (room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"))) {
+                throw new RuntimeException("借刀期间不能使用技能！");
+            }
+
+            for (Player other : room.getPlayers()) {
+                if (other.getUserId().equals(userId) || !"PLAYING".equals(other.getStatus())) {
+                    continue;
+                }
+                drawCards(room, other, 2);
+                checkOverloadAndWin(room, other);
+            }
+
+            player.setGuixinDisabled(true);
+            log.info("玩家 [{}] 发动【归心】：除自己外所有角色摸 2 张牌，并立即结束回合", userId);
+
+            if (hasWinner(room)) {
+                return;
+            }
+            handleNextTurnAfterPass(room);
+        }
+    }
+
+    public String getPendingGuixinPasser(String roomId) {
+        GameRoom room = roomMap.get(roomId);
+        if (room == null) return null;
+        Object passer = room.getSettings().get(GUIXIN_PENDING_PASSER);
+        return passer instanceof String ? (String) passer : null;
+    }
+
+    public String getPendingGuixinSource(String roomId) {
+        GameRoom room = roomMap.get(roomId);
+        if (room == null) return GUIXIN_SOURCE_PASS;
+        Object source = room.getSettings().get(GUIXIN_PENDING_SOURCE);
+        return source instanceof String ? (String) source : GUIXIN_SOURCE_PASS;
+    }
+
+    public boolean resolveGuixinDecision(String roomId, String ownerId, boolean accept) {
+        GameRoom room = roomMap.get(roomId);
+        if (room == null) return false;
+
+        synchronized (room) {
+            if (!GUIXIN_DECISION.equals(room.getCurrentAoeType())
+                    || !room.getPendingAoePlayers().contains(ownerId)) {
+                return false;
+            }
+
+            String pendingOwner = (String) room.getSettings().get(GUIXIN_PENDING_OWNER);
+            String passerId = (String) room.getSettings().get(GUIXIN_PENDING_PASSER);
+            String source = (String) room.getSettings().getOrDefault(GUIXIN_PENDING_SOURCE, GUIXIN_SOURCE_PASS);
+            if (!ownerId.equals(pendingOwner) || passerId == null) {
+                return false;
+            }
+
+            Player owner = getPlayer(room, ownerId);
+            Player passer = getPlayer(room, passerId);
+            boolean accepted = accept
+                    && owner != null
+                    && "PLAYING".equals(owner.getStatus())
+                    && "GUIXIN".equals(owner.getSkill())
+                    && owner.isGuixinDisabled();
+
+            boolean hadGushouProtection = GUIXIN_SOURCE_PASS.equals(source)
+                    && room.getSettings().remove("gushou_active_" + passerId) != null;
+            clearGuixinPending(room);
+
+            if (accepted) {
+                owner.setGuixinDisabled(false);
+                log.info("玩家 [{}] 发动【归心】保护 [{}] 本次要不起不摸牌，并解除归心禁用", ownerId, passerId);
+            } else if (passer != null && "PLAYING".equals(passer.getStatus())) {
+                if (GUIXIN_SOURCE_GUSHOU.equals(source)) {
+                    continueGushouAfterGuixin(room, passer);
+                    return accepted;
+                }
+                if (GUIXIN_SOURCE_GUANXING.equals(source)) {
+                    passer.setHasUsedSkillThisTurn(true);
+                    startGuanxing(room, passerId, GUIXIN_SOURCE_PASS);
+                    return accepted;
+                }
+                if (hadGushouProtection) {
+                    log.info("玩家 [{}] 放弃归心保护，[{}] 的固守生效，免除要不起摸牌惩罚", ownerId, passerId);
+                } else {
+                    drawCards(room, passer, 2);
+                    checkOverloadAndWin(room, passer);
+                    log.info("玩家 [{}] 放弃归心保护，[{}] 按普通要不起摸 2 张牌", ownerId, passerId);
+                }
+            }
+
+            promoteWinnerIfOnlyOneAlive(room);
+            if (hasWinner(room)) {
+                return accepted;
+            }
+
+            handleNextTurnAfterPass(room);
+            return accepted;
         }
     }
 
@@ -875,6 +1011,94 @@ public class GameService {
 
     // --- 内部辅助方法 ---
 
+    private boolean startGuixinDecisionForPass(GameRoom room, String passerId) {
+        return startGuixinDecision(room, passerId, GUIXIN_SOURCE_PASS);
+    }
+
+    private boolean startGuixinDecision(GameRoom room, String passerId, String source) {
+        if (room.getCurrentAoeType() != null) {
+            return false;
+        }
+        if (room.getLastPlayedCards() == null || room.getLastPlayedCards().isEmpty()) {
+            return false;
+        }
+
+        String ownerId = room.getLastPlayPlayerId();
+        if (ownerId == null || ownerId.isBlank() || ownerId.equals(passerId)) {
+            return false;
+        }
+
+        Player owner = getPlayer(room, ownerId);
+        log.info("【归心】触发检查：passer=[{}], tableOwner=[{}], ownerStatus={}, ownerSkill={}, guixinDisabled={}, gushouActive={}",
+                passerId,
+                ownerId,
+                owner == null ? null : owner.getStatus(),
+                owner == null ? null : owner.getSkill(),
+                owner != null && owner.isGuixinDisabled(),
+                room.getSettings().containsKey("gushou_active_" + passerId));
+        if (owner == null
+                || !"PLAYING".equals(owner.getStatus())
+                || !"GUIXIN".equals(owner.getSkill())
+                || !owner.isGuixinDisabled()) {
+            log.info("【归心】未触发：桌面拥有者不满足归心待响应条件，passer=[{}], tableOwner=[{}]", passerId, ownerId);
+            return false;
+        }
+
+        room.setCurrentAoeType(GUIXIN_DECISION);
+        room.setAoeStartTime(System.currentTimeMillis());
+        room.getPendingAoePlayers().clear();
+        room.getPendingAoePlayers().add(ownerId);
+        room.getSettings().put(GUIXIN_PENDING_OWNER, ownerId);
+        room.getSettings().put(GUIXIN_PENDING_PASSER, passerId);
+        room.getSettings().put(GUIXIN_PENDING_SOURCE, source);
+        log.info("玩家 [{}] 触发 [{}] 的【归心】保护选择，来源 [{}]", passerId, ownerId, source);
+        return true;
+    }
+
+    private void clearGuixinPending(GameRoom room) {
+        room.getSettings().remove(GUIXIN_PENDING_OWNER);
+        room.getSettings().remove(GUIXIN_PENDING_PASSER);
+        room.getSettings().remove(GUIXIN_PENDING_SOURCE);
+        if (GUIXIN_DECISION.equals(room.getCurrentAoeType())) {
+            room.setCurrentAoeType(null);
+            room.getPendingAoePlayers().clear();
+            room.setAoeStartTime(0);
+        }
+    }
+
+    private void clearGuixinPendingIfRelated(GameRoom room, String userId) {
+        if (!GUIXIN_DECISION.equals(room.getCurrentAoeType())) {
+            return;
+        }
+        String ownerId = (String) room.getSettings().get(GUIXIN_PENDING_OWNER);
+        String passerId = (String) room.getSettings().get(GUIXIN_PENDING_PASSER);
+        if (userId.equals(ownerId) || userId.equals(passerId)) {
+            clearGuixinPending(room);
+        }
+    }
+
+    private void drawCards(GameRoom room, Player player, int count) {
+        for (int i = 0; i < count; i++) {
+            Card c = drawCard(room);
+            if (c != null) {
+                player.getHandCards().add(c);
+            }
+        }
+    }
+
+    private void promoteWinnerIfOnlyOneAlive(GameRoom room) {
+        long aliveCount = room.getPlayers().stream().filter(p -> "PLAYING".equals(p.getStatus())).count();
+        if (aliveCount <= 1) {
+            for (Player p : room.getPlayers()) {
+                if ("PLAYING".equals(p.getStatus())) p.setStatus("WON");
+            }
+        }
+    }
+
+    private boolean hasWinner(GameRoom room) {
+        return room.getPlayers().stream().anyMatch(p -> "WON".equals(p.getStatus()));
+    }
+
     private void nextTurn(GameRoom room) {
         // ====== 【铁骑 · 压制】：判定成功 → 清桌面、所有其他 PLAYING 玩家各罚摸 2 张、轮回发动者 ======
         if (room.getSettings().containsKey("tieqiSkipRound")) {
@@ -896,6 +1120,7 @@ public class GameService {
                 initiator.setHasReplacedCardThisTurn(false);
                 initiator.setHasUsedAoeThisTurn(false);
                 initiator.setHasUsedSkillThisTurn(false);
+                initiator.setKurouUsesThisTurn(0);
             }
 
             // —— 对其他 PLAYING 玩家执行「压制」：各罚摸 2 张 ——
@@ -936,6 +1161,7 @@ public class GameService {
         nextPlayer.setHasReplacedCardThisTurn(false);
         nextPlayer.setHasUsedAoeThisTurn(false); // 【新增】
         nextPlayer.setHasUsedSkillThisTurn(false);
+        nextPlayer.setKurouUsesThisTurn(0);
         log.info(">>> 回合流转: 当前轮到玩家 [{}] 行动", nextPlayer.getUserId());
     }
 
@@ -1049,6 +1275,7 @@ public class GameService {
             room.getSettings().remove("jdsr_initiator");
             room.getSettings().remove("game_recorded");
             room.getSettings().remove("game_start_time");
+            clearGuixinPending(room);
             room.setStarted(false);
             room.getTableCards().clear();
             room.setLastPlayUserId("");
@@ -1074,6 +1301,8 @@ public class GameService {
                 p.setHasReplacedCardThisTurn(false);
                 p.setHasUsedAoeThisTurn(false);
                 p.setHasUsedSkillThisTurn(false);
+                p.setGuixinDisabled(false);
+                p.setKurouUsesThisTurn(0);
             }
             java.util.List<String> toRemove = new java.util.ArrayList<>();
             for (String specId : room.getSpectators()) {
@@ -1168,6 +1397,9 @@ public class GameService {
 
         // ====== 【核心修复 1：加锁防止玩家退出时与其他操作并发冲突】 ======
         synchronized (room) {
+            boolean wasGuixinPending = GUIXIN_DECISION.equals(room.getCurrentAoeType());
+            String pendingGuixinOwner = (String) room.getSettings().get(GUIXIN_PENDING_OWNER);
+            String pendingGuixinPasser = (String) room.getSettings().get(GUIXIN_PENDING_PASSER);
             if (room.isStarted()) {
                 if (p != null) {
                     p.setDisconnected(true); // 无论死活，标记为幽灵
@@ -1179,6 +1411,7 @@ public class GameService {
                             room.getDiscardPile().addAll(p.getHandCards());
                             p.getHandCards().clear();
                         }
+                        clearGuixinPendingIfRelated(room, userId);
                         room.getPendingAoePlayers().remove(userId);
                         if (room.getCurrentAoeType() != null && room.getPendingAoePlayers().isEmpty()) {
                             endAoePhase(room);
@@ -1202,6 +1435,14 @@ public class GameService {
                                     if (!room.getLastPlayedCards().isEmpty()) room.getDiscardPile().addAll(room.getLastPlayedCards());
                                     room.getLastPlayedCards().clear();
                                     room.setLastPlayPlayerId("");
+                                }
+                            } else if (wasGuixinPending
+                                    && userId.equals(pendingGuixinOwner)
+                                    && pendingGuixinPasser != null
+                                    && room.getCurrentAoeType() == null) {
+                                Player passer = getPlayer(room, pendingGuixinPasser);
+                                if (passer != null && "PLAYING".equals(passer.getStatus()) && isPlayerTurn(room, pendingGuixinPasser)) {
+                                    handleNextTurnAfterPass(room);
                                 }
                             }
                         }
@@ -1423,6 +1664,10 @@ public class GameService {
             throw new RuntimeException("本回合已使用过技能！");
         }
 
+        if (startGuixinDecision(room, userId, GUIXIN_SOURCE_GUSHOU)) {
+            return;
+        }
+
         player.setHasUsedSkillThisTurn(true);
         log.info("玩家 [{}] 主动发动固守，摸 4 张牌", userId);
 
@@ -1460,8 +1705,35 @@ public class GameService {
         }
     }
 
+    private void continueGushouAfterGuixin(GameRoom room, Player player) {
+        String userId = player.getUserId();
+        player.setHasUsedSkillThisTurn(true);
+        log.info("玩家 [{}] 的固守未被归心保护，继续结算固守摸 4 张牌", userId);
+
+        drawCards(room, player, 4);
+        room.getSettings().put("gushou_active_" + userId, true);
+
+        if (player.getHandCards().size() > 14) {
+            player.setStatus("LOST");
+            checkOverloadAndWin(room, player);
+            promoteWinnerIfOnlyOneAlive(room);
+        }
+
+        if (hasWinner(room)) {
+            return;
+        }
+
+        nextTurn(room);
+
+        Player nextPlayer = room.getPlayers().get(room.getCurrentTurnIndex());
+        if (nextPlayer.getUserId().equals(room.getLastPlayPlayerId())) {
+            if (room.getLastPlayedCards() != null) room.getLastPlayedCards().clear();
+            room.setLastPlayPlayerId("");
+        }
+    }
+
     /**
-     * 【苦肉】：回合内无限次使用，弃 2 张手牌 + 摸 4 张。
+     * 【苦肉】：每回合最多 2 次，弃 2 张手牌 + 摸 4 张。
      * 跨回合累计 >= 3 次即永久觉醒（整局保留）。
      * 不消耗 hasUsedSkillThisTurn；借刀目标期间禁用；爆牌（>14）即输。
      * 返回布尔：是否由本次使用触发了觉醒（供 WS 层判断是否广播 SKILL_AWAKEN）。
@@ -1481,6 +1753,9 @@ public class GameService {
         // 觉醒后弃黑牌挂起期间禁止再发动苦肉，避免状态错乱
         if (player.isKurouPendingAwakenDiscard()) {
             throw new RuntimeException("请先处理觉醒后的弃置选择！");
+        }
+        if (player.getKurouUsesThisTurn() >= 2) {
+            throw new RuntimeException("本回合苦肉已使用 2 次！");
         }
         if (cards == null || cards.size() != 2) {
             throw new RuntimeException("苦肉必须弃置 2 张牌！");
@@ -1512,6 +1787,7 @@ public class GameService {
 
         // 累计计数 + 觉醒判定
         boolean awakenTriggered = false;
+        player.setKurouUsesThisTurn(player.getKurouUsesThisTurn() + 1);
         player.setKurouUseCount(player.getKurouUseCount() + 1);
         if (player.getKurouUseCount() >= 3 && !player.isKurouAwakened()) {
             player.setKurouAwakened(true);
@@ -1519,8 +1795,8 @@ public class GameService {
             log.info("玩家 [{}] 苦肉累计使用 {} 次，触发永久觉醒！",
                     userId, player.getKurouUseCount());
         }
-        log.info("玩家 [{}] 发动苦肉：弃 2 摸 4（手牌 {} 张，累计 {} 次{}）",
-                userId, player.getHandCards().size(), player.getKurouUseCount(),
+        log.info("玩家 [{}] 发动苦肉：弃 2 摸 4（手牌 {} 张，本回合 {} 次，累计 {} 次{}）",
+                userId, player.getHandCards().size(), player.getKurouUsesThisTurn(), player.getKurouUseCount(),
                 player.isKurouAwakened() ? "，已觉醒" : "");
 
         // 爆牌（>14）即输，参照固守逻辑

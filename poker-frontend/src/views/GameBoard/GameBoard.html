@@ -193,6 +193,16 @@
           </div>
 
           <div
+            v-else-if="currentAoeType === 'GUIXIN_DECISION'"
+            class="played-cards"
+          >
+            <p class="table-hint art-text-guixin">
+              {{ pendingAoePlayers[0] === userId ? '你' : pendingAoePlayers[0]
+              }}：正在抉择归心...
+            </p>
+          </div>
+
+          <div
             v-else-if="currentAoeType"
             class="played-cards aoe-table-display"
           >
@@ -243,7 +253,39 @@
   </div>
 
   <div class="action-bar gb-action-bar" v-else-if="handCards.length > 0">
-    <template v-if="currentAoeType === 'GUSHOU_DISCARD'">
+    <template v-if="currentAoeType === 'GUIXIN_DECISION'">
+      <div
+        v-if="showGuixinModal"
+        class="aoe-action-bar guixin-action-bar"
+      >
+        <div class="countdown-timer" :class="{ hurry: countdown <= 3 }">
+          <svg class="gb-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M12 9v4l2.5 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            <path d="M9 3h6M8 5l-2 2m12-2 2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+          {{ countdown }}s
+        </div>
+        <span class="aoe-hint">归心：是否保护 {{ guixinPendingPasser }} 本次要不起不摸牌？</span>
+        <button
+          @click="confirmGuixinDecision(false)"
+          class="pass-btn gb-btn gb-btn--pass"
+        >
+          不发动
+        </button>
+        <button
+          @click="confirmGuixinDecision(true)"
+          class="play-btn gb-btn gb-btn--guixin"
+        >
+          发动归心
+        </button>
+      </div>
+      <div v-else class="wait-text" style="color: #9ee8d8">
+        <svg class="gb-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12M6 21h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 3v3a5 5 0 0 0 5 5 5 5 0 0 0 5-5V3M7 21v-3a5 5 0 0 1 5-5 5 5 0 0 1 5 5v3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> 正在等待 {{ pendingAoePlayers[0] }} 抉择归心...
+      </div>
+    </template>
+
+    <template v-else-if="currentAoeType === 'GUSHOU_DISCARD'">
       <div
         v-if="amIPendingAoe"
         class="aoe-action-bar"
@@ -455,20 +497,22 @@
           v-if="mySkill !== 'GUANXING' && mySkill !== 'TIEQI' && !(mySkill === 'KUROU' && jdsrTarget === userId)"
           @click="replaceCard"
           class="gb-btn"
-          :class="mySkill === 'KUROU' ? 'kurou-btn gb-btn--kurou' : 'pass-btn gb-btn--pass'"
+          :class="mySkill === 'KUROU' ? 'kurou-btn gb-btn--kurou' : mySkill === 'GUIXIN' ? 'guixin-btn gb-btn--guixin' : 'pass-btn gb-btn--pass'"
           :disabled="
             jdsrTarget === userId ? true :
             mySkill === 'ZHIHENG' ? selectedCards.length !== 1 : 
             mySkill === 'LUANJIAN' ? selectedCards.length !== 2 :
             mySkill === 'GUSHOU' ? (tableCards.length === 0 && !onlyHasScrolls) : 
-            mySkill === 'KUROU' ? selectedCards.length !== 2 :
+            mySkill === 'KUROU' ? (selectedCards.length !== 2 || kurouUsesThisTurn >= 2) :
+            mySkill === 'GUIXIN' ? guixinDisabled :
             false
           "
         >
           {{
             mySkill === 'LUANJIAN' ? '乱箭' :
             mySkill === 'GUSHOU' ? '固守' :
-            mySkill === 'KUROU' ? (kurouAwakened ? '苦肉·觉醒' : ('苦肉 (' + kurouUseCount + '/3)')) :
+            mySkill === 'KUROU' ? ((kurouAwakened ? '苦肉·觉醒 ' : '苦肉 ') + kurouUsesThisTurn + '/2') :
+            mySkill === 'GUIXIN' ? (guixinDisabled ? '归心禁用' : '归心') :
             '制衡'
           }}
         </button>
@@ -766,7 +810,7 @@
       <div class="skill-card kurou-card" @click="selectSkill('KUROU')">
         <h3>苦肉</h3>
         <p>
-          出牌阶段无限次，弃置 2 张手牌并摸 4 张牌。累计使用 3
+          出牌阶段每回合最多 2 次，弃置 2 张手牌并摸 4 张牌。累计使用 3
           次永久觉醒：此后每次主动打出普通牌后，可额外弃置一张黑色牌。
         </p>
       </div>
@@ -776,6 +820,13 @@
         <p>
           打出含红色牌时，亮出牌堆顶一张判定牌。
           若判定牌为红色且点数严格小于本次出牌最大红色牌，则触发「压制」：其余玩家强制要不起并各罚摸 2 张牌，你继续出牌。
+        </p>
+      </div>
+
+      <div class="skill-card guixin-card" @click="selectSkill('GUIXIN')">
+        <h3>归心</h3>
+        <p>
+          回合内可使用，除你外所有角色摸 2 张牌，你立即结束回合并禁用归心。之后当桌面是你的牌且其他玩家要不起时，可保护其本次不摸牌并解除禁用。
         </p>
       </div>
     </div>

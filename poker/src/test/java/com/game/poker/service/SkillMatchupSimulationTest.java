@@ -29,7 +29,8 @@ class SkillMatchupSimulationTest {
             "GUANXING",
             "GUSHOU",
             "KUROU",
-            "TIEQI"
+            "TIEQI",
+            "GUIXIN"
     );
 
     private static final int GAMES_PER_MATCHUP = Integer.getInteger("skill.matchup.games", 50);
@@ -421,6 +422,15 @@ class SkillMatchupSimulationTest {
                 Card discard = aiService.chooseKurouAwakenDiscardCard(bot);
                 gameService.kurouAwakenDiscard(room.getRoomId(), bot.getUserId(), discard);
             }
+            case GameService.GUIXIN_DECISION -> {
+                String passerId = gameService.getPendingGuixinPasser(room.getRoomId());
+                Player passer = room.getPlayers().stream()
+                        .filter(player -> player.getUserId().equals(passerId))
+                        .findFirst()
+                        .orElse(null);
+                boolean accept = aiService.chooseGuixinProtection(room, bot, passer);
+                gameService.resolveGuixinDecision(room.getRoomId(), bot.getUserId(), accept);
+            }
             default -> {
                 Card responseCard = aiService.chooseAoeResponseCard(room, bot);
                 gameService.respondAoe(room.getRoomId(), bot.getUserId(), responseCard);
@@ -457,10 +467,13 @@ class SkillMatchupSimulationTest {
                 replaceWithRecovery(gameService, room, bot, decision.getCards().get(0));
             }
             case USE_SKILL -> {
-                if (!"LUANJIAN".equals(decision.getSkill())) {
+                if ("LUANJIAN".equals(decision.getSkill())) {
+                    luanjianWithRecovery(gameService, room, bot, decision.getCards());
+                } else if ("GUIXIN".equals(decision.getSkill())) {
+                    guixinWithRecovery(gameService, room, bot);
+                } else {
                     throw new IllegalStateException("Unsupported scripted skill action: " + decision.getSkill());
                 }
-                luanjianWithRecovery(gameService, room, bot, decision.getCards());
             }
             case USE_GUSHOU -> gushouWithRecovery(gameService, room, bot);
             case USE_KUROU -> kurouWithRecovery(gameService, room, bot, decision.getCards());
@@ -543,6 +556,20 @@ class SkillMatchupSimulationTest {
             return;
         }
         throw new IllegalStateException("Bot GUSHOU failed without a valid fallback");
+    }
+
+    private void guixinWithRecovery(GameService gameService, GameRoom room, Player bot) {
+        try {
+            gameService.useGuixin(room.getRoomId(), bot.getUserId());
+            return;
+        } catch (RuntimeException ignored) {
+            // Fall through to fallback logic.
+        }
+
+        if (tryFallbackPass(gameService, room, bot)) {
+            return;
+        }
+        throw new IllegalStateException("Bot GUIXIN failed without a valid fallback");
     }
 
     private void kurouWithRecovery(GameService gameService, GameRoom room, Player bot, List<Card> cards) {

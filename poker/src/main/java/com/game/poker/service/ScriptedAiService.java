@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class ScriptedAiService {
-    private static final List<String> BOT_SKILLS = List.of("ZHIHENG", "LUANJIAN", "GUANXING", "GUSHOU", "KUROU", "TIEQI");
+    private static final List<String> BOT_SKILLS = List.of("ZHIHENG", "LUANJIAN", "GUANXING", "GUSHOU", "KUROU", "TIEQI", "GUIXIN");
 
     // 用于让 candidateScore 在「这手打完即赢」的候选上始终返回最小分数。
     // 取一个远小于普通 score 可能到达区间的常量（普通 score 通常在几十到几千）。
@@ -88,12 +88,18 @@ public class ScriptedAiService {
                 ? null
                 : chooseBestScrollAction(room, bot, hand, freeTurn, bestNormal, cache);
 
+        if ("GUIXIN".equals(bot.getSkill()) && !bot.isGuixinDisabled()
+                && shouldUseGuixin(room, bot, hand, freeTurn, bestNormal, bestScroll, cache)) {
+            return TurnDecision.useSkill("GUIXIN", List.of());
+        }
+
         if (!freeTurn && "GUSHOU".equals(bot.getSkill()) && !bot.isHasUsedSkillThisTurn()
                 && shouldUseGushou(room, bot, hand, bestNormal, bestScroll, cache)) {
             return TurnDecision.useGushou();
         }
 
-        if ("KUROU".equals(bot.getSkill()) && !bot.isKurouPendingAwakenDiscard()) {
+        if ("KUROU".equals(bot.getSkill()) && !bot.isKurouPendingAwakenDiscard()
+                && bot.getKurouUsesThisTurn() < 2) {
             List<Card> kurouDiscards = chooseKurouDiscards(hand);
             if (kurouDiscards.size() == 2 && shouldUseKurou(room, bot, hand, bestNormal, cache)) {
                 return TurnDecision.useKurou(kurouDiscards);
@@ -162,6 +168,24 @@ public class ScriptedAiService {
         return options.stream()
                 .max(Comparator.comparingInt(card -> wgfdPickScore(hand, card)))
                 .orElse(options.isEmpty() ? null : options.get(0));
+    }
+
+    public boolean chooseGuixinProtection(GameRoom room, Player owner, Player passer) {
+        if (room == null || owner == null || passer == null) {
+            return false;
+        }
+        if (!"GUIXIN".equals(owner.getSkill()) || !owner.isGuixinDisabled()) {
+            return false;
+        }
+        if (!"PLAYING".equals(owner.getStatus()) || !"PLAYING".equals(passer.getStatus())) {
+            return false;
+        }
+
+        int passerCards = safeHand(passer).size();
+        if (passerCards <= 2 || passerCards >= 13) {
+            return false;
+        }
+        return true;
     }
 
     public List<Card> chooseGushouDiscards(Player bot, int count) {
@@ -280,6 +304,24 @@ public class ScriptedAiService {
                 new HashMap<>()
         );
         return fallback == null ? List.of() : new ArrayList<>(fallback.cards);
+    }
+
+    private boolean shouldUseGuixin(GameRoom room, Player bot, List<Card> hand,
+                                    boolean freeTurn, PlayCandidate bestNormal,
+                                    ScrollAction bestScroll, Map<String, Integer> cache) {
+        if (bestScroll != null || isThreatSituation(room, bot)) {
+            return false;
+        }
+        if (hand.size() >= 11) {
+            return false;
+        }
+        if (freeTurn) {
+            return bestNormal == null && hand.stream().allMatch(card -> SUIT_SCROLL.equals(card.getSuit()));
+        }
+        if (bestNormal != null && shouldPlayResponse(room, bot, bestNormal, hand, cache)) {
+            return false;
+        }
+        return bestNormal == null || playDisruptionCost(hand, bestNormal) >= 34;
     }
 
     private boolean shouldUseGushou(GameRoom room, Player bot, List<Card> hand,

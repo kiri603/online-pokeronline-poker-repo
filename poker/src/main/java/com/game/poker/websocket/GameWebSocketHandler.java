@@ -316,7 +316,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 case "USE_GUSHOU":
                     try {
                         gameService.useGushou(roomId, userId);
+                        GameRoom currentRoom = gameService.getRoom(roomId);
                         syncPlayerHand(roomId, userId);
+                        if (currentRoom != null && GameService.GUIXIN_DECISION.equals(currentRoom.getCurrentAoeType())) {
+                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"PLAYER_PASSED\", \"userId\": \"" + userId + "\"}"));
+                            broadcastGameState(roomId);
+                            break;
+                        }
                         broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + userId + "\", \"skillName\": \"GUSHOU\"}"));
                         // ====== 【核心修复】：补上遗漏的游戏结束广播 ======
                         publishWinnerIfNeeded(roomId, List.of());
@@ -393,6 +399,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                             List<Card> fourCards = (List<Card>) currentRoom.getSettings().get("guanxingCards");
                             String cardsJson = objectMapper.writeValueAsString(fourCards);
                             sendToUser(roomId, userId, new TextMessage("{\"event\": \"GUANXING_SHOW\", \"cards\": " + cardsJson + "}"));
+                            broadcastGameState(roomId);
+                            break;
+                        }
+                        if (GameService.GUIXIN_DECISION.equals(currentRoom.getCurrentAoeType())) {
+                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"PLAYER_PASSED\", \"userId\": \"" + userId + "\"}"));
                             broadcastGameState(roomId);
                             break;
                         }
@@ -509,14 +520,16 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                             // 【新增】：拦截明面的观星按钮点击，直接引流给 passTurn
                             gameService.passTurn(roomId, userId);
                             GameRoom currentRoom = gameService.getRoom(roomId);
-                            if ("GUANXING".equals(currentRoom.getCurrentAoeType()) && currentRoom.getPendingAoePlayers().contains(userId)) {
+                            if (GameService.GUIXIN_DECISION.equals(currentRoom.getCurrentAoeType())) {
+                                broadcastToRoom(roomId, new TextMessage("{\"event\": \"PLAYER_PASSED\", \"userId\": \"" + userId + "\"}"));
+                            } else if ("GUANXING".equals(currentRoom.getCurrentAoeType()) && currentRoom.getPendingAoePlayers().contains(userId)) {
                                 broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + userId + "\", \"skillName\": \"GUANXING\"}"));
                                 List<Card> fourCards = (List<Card>) currentRoom.getSettings().get("guanxingCards");
                                 String cardsJson = objectMapper.writeValueAsString(fourCards);
                                 sendToUser(roomId, userId, new TextMessage("{\"event\": \"GUANXING_SHOW\", \"cards\": " + cardsJson + "}"));
                             }
                         } else if ("KUROU".equals(skillName)) {
-                            // ====== 【新增：苦肉】弃 2 摸 4，回合内无限次；累计 3 次永久觉醒 ======
+                            // ====== 【苦肉】弃 2 摸 4，每回合最多 2 次；累计 3 次永久觉醒 ======
                             List<Card> cards = objectMapper.convertValue(skillData.get("cards"), new com.fasterxml.jackson.core.type.TypeReference<List<Card>>(){});
                             boolean awakenTriggered = gameService.useKurou(roomId, userId, cards);
                             broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + userId + "\", \"skillName\": \"KUROU\"}"));
@@ -524,6 +537,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                                 broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_AWAKEN\", \"userId\": \"" + userId + "\", \"skillName\": \"KUROU\"}"));
                             }
                             // 苦肉使用后可能爆牌淘汰 / 触发躺赢
+                            publishWinnerIfNeeded(roomId, List.of());
+                        } else if ("GUIXIN".equals(skillName)) {
+                            gameService.useGuixin(roomId, userId);
+                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + userId + "\", \"skillName\": \"GUIXIN\"}"));
+                            syncAllHands(roomId);
                             publishWinnerIfNeeded(roomId, List.of());
                         }
                         syncPlayerHand(roomId, userId);// 【核心修复】：无论放什么技能，强刷全场手牌！
@@ -563,6 +581,37 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                             broadcastToRoom(roomId, new TextMessage("{\"event\": \"ROUND_RESET\"}"));
                         }
                         publishWinnerIfNeeded(roomId, List.of());
+                        broadcastGameState(roomId);
+                    } catch (Exception e) {
+                        session.sendMessage(new TextMessage("{\"event\": \"ERROR\", \"msg\": \"" + e.getMessage() + "\"}"));
+                    }
+                    break;
+                case "GUIXIN_DECISION":
+                    try {
+                        boolean accept = false;
+                        if (gameMsg.getData() instanceof Boolean bool) {
+                            accept = bool;
+                        } else if (gameMsg.getData() instanceof Map<?, ?> data) {
+                            Object rawAccept = data.get("accept");
+                            accept = rawAccept instanceof Boolean b && b;
+                        }
+                        String passerId = gameService.getPendingGuixinPasser(roomId);
+                        String guixinSource = gameService.getPendingGuixinSource(roomId);
+                        boolean accepted = gameService.resolveGuixinDecision(roomId, userId, accept);
+                        if (accepted) {
+                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + userId + "\", \"skillName\": \"GUIXIN\"}"));
+                        } else {
+                            publishGuixinContinuation(roomId, guixinSource, passerId);
+                        }
+                        broadcastToRoom(roomId, new TextMessage(
+                                "{\"event\": \"GUIXIN_RESOLVED\", \"userId\": \"" + userId + "\", \"passerId\": \"" + (passerId == null ? "" : passerId) + "\", \"accepted\": " + accepted + "}"
+                        ));
+                        syncAllHands(roomId);
+                        publishWinnerIfNeeded(roomId, List.of());
+                        GameRoom roomAfter = gameService.getRoom(roomId);
+                        if (roomAfter != null && roomAfter.getLastPlayedCards().isEmpty()) {
+                            broadcastToRoom(roomId, new TextMessage("{\"event\": \"ROUND_RESET\"}"));
+                        }
                         broadcastGameState(roomId);
                     } catch (Exception e) {
                         session.sendMessage(new TextMessage("{\"event\": \"ERROR\", \"msg\": \"" + e.getMessage() + "\"}"));
@@ -764,6 +813,29 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
     }
     // --- 新增：仅向指定玩家定向发送消息（保护手牌隐私） ---
+    @SuppressWarnings("unchecked")
+    private void publishGuixinContinuation(String roomId, String source, String passerId) throws Exception {
+        if (passerId == null || passerId.isBlank()) {
+            return;
+        }
+        GameRoom room = gameService.getRoom(roomId);
+        if (room == null) {
+            return;
+        }
+        if (GameService.GUIXIN_SOURCE_GUANXING.equals(source)
+                && "GUANXING".equals(room.getCurrentAoeType())
+                && room.getPendingAoePlayers().contains(passerId)) {
+            broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + passerId + "\", \"skillName\": \"GUANXING\"}"));
+            List<Card> guanxingCards = (List<Card>) room.getSettings().get("guanxingCards");
+            String cardsJson = objectMapper.writeValueAsString(guanxingCards == null ? List.of() : guanxingCards);
+            sendToUser(roomId, passerId, new TextMessage("{\"event\": \"GUANXING_SHOW\", \"cards\": " + cardsJson + "}"));
+            return;
+        }
+        if (GameService.GUIXIN_SOURCE_GUSHOU.equals(source)) {
+            broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + passerId + "\", \"skillName\": \"GUSHOU\"}"));
+        }
+    }
+
     private void sendToUser(String roomId, String userId, TextMessage message) throws Exception {
         CopyOnWriteArraySet<WebSocketSession> sessions = roomSessions.get(roomId);
         if (sessions != null) {
@@ -809,9 +881,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 pInfo.put("isReady", p.isReady());
                 pInfo.put("isBot", p.isBot());
                 pInfo.put("skill", p.getSkill());
-                // 【苦肉】对外暴露计数和觉醒态，供前端 UI 展示 (0/3) 与觉醒特效
+                // 【苦肉】对外暴露计数和觉醒态，供前端 UI 展示与禁用
                 pInfo.put("kurouUseCount", p.getKurouUseCount());
+                pInfo.put("kurouUsesThisTurn", p.getKurouUsesThisTurn());
                 pInfo.put("kurouAwakened", p.isKurouAwakened());
+                pInfo.put("guixinDisabled", p.isGuixinDisabled());
                 playersInfo.add(pInfo);
             }
 
@@ -834,6 +908,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             if (room.getSettings().containsKey("jdsr_target")) {
                 safeSettings.put("jdsr_target", room.getSettings().get("jdsr_target"));
                 safeSettings.put("jdsr_initiator", room.getSettings().get("jdsr_initiator"));
+            }
+            if (GameService.GUIXIN_DECISION.equals(room.getCurrentAoeType())) {
+                safeSettings.put("guixin_pending_owner", room.getSettings().get("guixin_pending_owner"));
+                safeSettings.put("guixin_pending_passer", room.getSettings().get("guixin_pending_passer"));
+                safeSettings.put("guixin_pending_source", room.getSettings().get("guixin_pending_source"));
             }
 
             state.put("settings", safeSettings);
@@ -975,6 +1054,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
 
         switch (aoeType) {
+            case GameService.GUIXIN_DECISION:
+                handleBotGuixinDecision(roomId, bot);
+                break;
             case "GUANXING":
                 handleBotGuanxing(roomId, bot);
                 break;
@@ -1031,6 +1113,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case USE_SKILL:
                 if ("LUANJIAN".equals(decision.getSkill())) {
                     handleBotLuanjian(roomId, bot, decision.getCards());
+                } else if ("GUIXIN".equals(decision.getSkill())) {
+                    handleBotUseGuixin(roomId, bot);
                 }
                 break;
             case USE_GUSHOU:
@@ -1330,7 +1414,27 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
         syncPlayerHand(roomId, bot.getUserId());
+        GameRoom roomAfter = gameService.getRoom(roomId);
+        if (roomAfter != null && GameService.GUIXIN_DECISION.equals(roomAfter.getCurrentAoeType())) {
+            broadcastToRoom(roomId, new TextMessage("{\"event\": \"PLAYER_PASSED\", \"userId\": \"" + bot.getUserId() + "\"}"));
+            broadcastGameState(roomId);
+            return;
+        }
         broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + bot.getUserId() + "\", \"skillName\": \"GUSHOU\"}"));
+        publishWinnerIfNeeded(roomId, List.of());
+        broadcastGameState(roomId);
+        maybeSendBotEmoji(roomId, bot, BotEmojiScenario.TACTICAL_PLAY);
+    }
+
+    private void handleBotUseGuixin(String roomId, com.game.poker.model.Player bot) throws Exception {
+        try {
+            gameService.useGuixin(roomId, bot.getUserId());
+        } catch (RuntimeException e) {
+            recoverBotAction(roomId, bot, "use GUIXIN", e);
+            return;
+        }
+        broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + bot.getUserId() + "\", \"skillName\": \"GUIXIN\"}"));
+        syncAllHands(roomId);
         publishWinnerIfNeeded(roomId, List.of());
         broadcastGameState(roomId);
         maybeSendBotEmoji(roomId, bot, BotEmojiScenario.TACTICAL_PLAY);
@@ -1404,6 +1508,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             broadcastGameState(roomId);
             return;
         }
+        if (GameService.GUIXIN_DECISION.equals(room.getCurrentAoeType())) {
+            broadcastToRoom(roomId, new TextMessage("{\"event\": \"PLAYER_PASSED\", \"userId\": \"" + bot.getUserId() + "\"}"));
+            broadcastGameState(roomId);
+            return;
+        }
 
         broadcastToRoom(roomId, new TextMessage("{\"event\": \"PLAYER_PASSED\", \"userId\": \"" + bot.getUserId() + "\"}"));
         syncPlayerHand(roomId, bot.getUserId());
@@ -1417,6 +1526,37 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         if (wasJdsrTarget || pressuredPass) {
             maybeSendBotEmoji(roomId, bot, BotEmojiScenario.PRESSURED_PASS);
         }
+    }
+
+    private void handleBotGuixinDecision(String roomId, com.game.poker.model.Player bot) throws Exception {
+        GameRoom room = gameService.getRoom(roomId);
+        if (room == null) {
+            return;
+        }
+        String passerId = gameService.getPendingGuixinPasser(roomId);
+        String guixinSource = gameService.getPendingGuixinSource(roomId);
+        com.game.poker.model.Player passer = room.getPlayers().stream()
+                .filter(player -> player.getUserId().equals(passerId))
+                .findFirst()
+                .orElse(null);
+        boolean accept = scriptedAiService.chooseGuixinProtection(room, bot, passer);
+        boolean accepted = gameService.resolveGuixinDecision(roomId, bot.getUserId(), accept);
+        if (accepted) {
+            broadcastToRoom(roomId, new TextMessage("{\"event\": \"SKILL_USED\", \"userId\": \"" + bot.getUserId() + "\", \"skillName\": \"GUIXIN\"}"));
+        } else {
+            publishGuixinContinuation(roomId, guixinSource, passerId);
+        }
+        broadcastToRoom(roomId, new TextMessage(
+                "{\"event\": \"GUIXIN_RESOLVED\", \"userId\": \"" + bot.getUserId() + "\", \"passerId\": \"" + (passerId == null ? "" : passerId) + "\", \"accepted\": " + accepted + "}"
+        ));
+        syncAllHands(roomId);
+        publishWinnerIfNeeded(roomId, List.of());
+        GameRoom roomAfter = gameService.getRoom(roomId);
+        if (roomAfter != null && roomAfter.getLastPlayedCards().isEmpty()) {
+            broadcastToRoom(roomId, new TextMessage("{\"event\": \"ROUND_RESET\"}"));
+        }
+        broadcastGameState(roomId);
+        maybeSendBotEmoji(roomId, bot, accepted ? BotEmojiScenario.DEFENSE_SUCCESS : BotEmojiScenario.TACTICAL_PLAY);
     }
 
     @SuppressWarnings("unchecked")

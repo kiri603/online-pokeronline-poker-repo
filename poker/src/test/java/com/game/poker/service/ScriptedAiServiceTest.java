@@ -207,6 +207,37 @@ class ScriptedAiServiceTest {
     }
 
     @Test
+    void kurouBotDoesNotUseKurouAfterTwoUsesThisTurn() throws Exception {
+        ScriptedAiService service = createServiceWithRuleEngine();
+        GameRoom room = new GameRoom("room-kurou-turn-limit");
+        Player bot = new Player("bot", true);
+        bot.setSkill("KUROU");
+        bot.setStatus("PLAYING");
+        bot.setKurouUsesThisTurn(2);
+        Player other = new Player("other");
+        other.setStatus("PLAYING");
+        String[] otherRanks = {"3", "4", "5", "6", "7"};
+        for (int i = 0; i < otherRanks.length; i++) {
+            other.getHandCards().add(card("\u2666", otherRanks[i], i + 1));
+        }
+
+        bot.getHandCards().add(card("\u2663", "3", 1));
+        bot.getHandCards().add(card("\u2663", "5", 3));
+        bot.getHandCards().add(card("\u2663", "7", 5));
+        bot.getHandCards().add(card("\u2663", "9", 7));
+        bot.getHandCards().add(card("\u2663", "J", 9));
+
+        room.setPlayers(new ArrayList<>(List.of(bot, other)));
+        room.setCurrentTurnIndex(0);
+        room.setLastPlayedCards(new ArrayList<>());
+        room.setLastPlayPlayerId("");
+
+        ScriptedAiService.TurnDecision decision = service.decideTurn(room, bot);
+
+        assertNotEquals(ScriptedAiService.TurnDecisionType.USE_KUROU, decision.getType());
+    }
+
+    @Test
     void emergencyFreeTurnPlayIgnoresScrollCards() throws Exception {
         ScriptedAiService service = createServiceWithRuleEngine();
         Player bot = new Player("bot", true);

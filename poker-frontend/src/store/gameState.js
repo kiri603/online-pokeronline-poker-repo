@@ -117,9 +117,13 @@ export const showWgfdModal = ref(false);
 export const wgfdCards = ref([]);
 export const selectedWgfdCard = ref([]);
 
-// ====== 【苦肉技能】：本地 me 的计数 / 觉醒态 ======
+// ====== 【苦肉技能】：本地 me 的累计计数 / 本回合次数 / 觉醒态 ======
 export const kurouUseCount = ref(0);
+export const kurouUsesThisTurn = ref(0);
 export const kurouAwakened = ref(false);
+export const guixinDisabled = ref(false);
+export const guixinPendingOwner = ref("");
+export const guixinPendingPasser = ref("");
 
 export const isClassicMode = computed(
   () =>
@@ -161,6 +165,10 @@ export const killText = computed(() => {
 
 export const amIPendingAoe = computed(() =>
   pendingAoePlayers.value.includes(userId.value),
+);
+
+export const showGuixinModal = computed(
+  () => currentAoeType.value === "GUIXIN_DECISION" && amIPendingAoe.value,
 );
 
 export const hasValidAoeCard = computed(() => {
