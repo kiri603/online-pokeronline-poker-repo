@@ -229,6 +229,18 @@
 - 关联模块：`GameService`、`GameWebSocketHandler`、技能单元测试。
 - 首次记录日期：2026-05-01，修复【归心不因固守式要不起重置】时沉淀。
 
+### 错误模式：挂起结算阶段仍接受普通回合动作导致桌面被滞后动作覆盖
+
+- 触发场景：用户主动出牌、使用技能或进入觉醒/锦囊挂起结算的同时，前端倒计时自动出牌、自动要不起、Bot 行动或重复点击消息延迟到达。
+- 错误表现：首个合法动作 A 已经结算，但滞后的自动动作 B 仍被服务端接受，导致手牌被二次移除、`lastPlayedCards` 被覆盖、回合被二次推进，前端桌面最终留下 B。
+- 根因：普通回合入口只判断 `isPlayerTurn(...)`，没有同时判断 `currentAoeType` / `pendingAoePlayers` 是否已经进入挂起结算；部分技能入口也没有统一房间锁，无法保证同一行动窗口只提交一次。
+- 以后禁止：只依赖前端 `isTimeoutTriggered`、按钮禁用或倒计时重置来防并发；在 `currentAoeType` 非空或 `pendingAoePlayers` 非空时继续允许 `PLAY_CARD`、`PASS`、普通技能按钮或 Bot 普通行动改变状态。
+- 推荐做法：服务端普通回合动作入口统一使用房间级锁，并在锁内先执行挂起结算门禁；只有当前挂起阶段对应的处理器（如 `kurouAwakenDiscard`、`respondAoe`、`resolveWgfd`、`resolveGuixinDecision`）可以处理该阶段消息。
+- 修改前检查：核对 `playCards(...)`、`passTurn(...)`、`replaceCard(...)`、`useLuanjian(...)`、`useGushou(...)`、`useKurou(...)`、`useGuixin(...)`、Bot 行动和 WebSocket 分发是否都不会绕过挂起阶段门禁。
+- 验证方式：补测试模拟“主动动作 A 成功后滞后自动动作 B 到达”，断言 B 被拒绝/忽略，桌面牌、手牌、弃牌堆、回合索引和挂起状态仍保持 A 后的状态；再跑核心技能测试和小样本技能模拟。
+- 关联模块：`GameService`、`GameWebSocketHandler`、`gameSocket.js`、`KurouSkillServiceTest`、技能/Bot 回归测试。
+- 首次记录日期：2026-05-05，修复【出牌与倒计时并发冲突导致桌面留下自动牌】时沉淀。
+
 ### 错误模式：新增技能漏同步公告、详细规则和语音资产
 
 - 触发场景：新增或调整武将技能、技能语音、技能按钮和技能结算文案。

@@ -247,60 +247,64 @@ public class GameService {
     }
     public void useLuanjian(String roomId, String userId, List<Card> cards) {
         GameRoom room = getRoom(roomId);
-        Player p = getPlayer(room, userId);
-        if (room == null || p == null || !isPlayerTurn(room, userId)) return;
-        if (room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"))) {
-            throw new RuntimeException("借刀期间不能使用技能！");
-        }
-        if (p.isHasUsedSkillThisTurn()) throw new RuntimeException("本回合已使用过技能！");
+        if (room == null) return;
+        synchronized (room) {
+            Player p = getPlayer(room, userId);
+            if (p == null || !isPlayerTurn(room, userId)) return;
+            ensureNoPendingResolution(room, "使用技能");
+            if (room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"))) {
+                throw new RuntimeException("借刀期间不能使用技能！");
+            }
+            if (p.isHasUsedSkillThisTurn()) throw new RuntimeException("本回合已使用过技能！");
 
-        // 【修改：变成消耗 2 张黑色牌】
-        if (cards.size() != 2) throw new RuntimeException("乱箭只能弃置 2 张牌！");
-        for (Card c : cards) {
-            if (!c.getSuit().equals("♠") && !c.getSuit().equals("♣")) throw new RuntimeException("乱箭必须使用黑色牌！");
-        }
+            // 【修改：变成消耗 2 张黑色牌】
+            if (cards.size() != 2) throw new RuntimeException("乱箭只能弃置 2 张牌！");
+            for (Card c : cards) {
+                if (!c.getSuit().equals("♠") && !c.getSuit().equals("♣")) throw new RuntimeException("乱箭必须使用黑色牌！");
+            }
 
-        for (Card playedCard : cards) {
-            java.util.Iterator<Card> iterator = p.getHandCards().iterator();
-            boolean found = false;
-            while (iterator.hasNext()) {
-                Card handCard = iterator.next();
-                if (handCard.getSuit().equals(playedCard.getSuit()) && handCard.getRank().equals(playedCard.getRank())) {
-                    iterator.remove(); found = true; break;
+            for (Card playedCard : cards) {
+                java.util.Iterator<Card> iterator = p.getHandCards().iterator();
+                boolean found = false;
+                while (iterator.hasNext()) {
+                    Card handCard = iterator.next();
+                    if (handCard.getSuit().equals(playedCard.getSuit()) && handCard.getRank().equals(playedCard.getRank())) {
+                        iterator.remove(); found = true; break;
+                    }
+                }
+                if (!found) throw new RuntimeException("手牌不足！");
+            }
+
+            room.getDiscardPile().addAll(cards);
+            p.setHasUsedSkillThisTurn(true);
+
+            room.setCurrentAoeType("WJQF");
+            room.setAoeStartTime(System.currentTimeMillis());
+            room.setAoeInitiator(userId);
+
+            room.getSettings().put("luanjian_initiator", userId); // 标记乱箭发动者
+
+            for (Player other : room.getPlayers()) {
+                if ("PLAYING".equals(other.getStatus())) {
+                    room.getPendingAoePlayers().add(other.getUserId());
                 }
             }
-            if (!found) throw new RuntimeException("手牌不足！");
-        }
 
-        room.getDiscardPile().addAll(cards);
-        p.setHasUsedSkillThisTurn(true);
-
-        room.setCurrentAoeType("WJQF");
-        room.setAoeStartTime(System.currentTimeMillis());
-        room.setAoeInitiator(userId);
-
-        room.getSettings().put("luanjian_initiator", userId); // 标记乱箭发动者
-
-        for (Player other : room.getPlayers()) {
-            if ("PLAYING".equals(other.getStatus())) {
-                room.getPendingAoePlayers().add(other.getUserId());
-            }
-        }
-
-        if (room.getPendingAoePlayers().isEmpty()) {
-            endAoePhase(room);
-        } else {
-            // ====== 【核心修复】：解决空手牌玩家卡死等 10 秒的 Bug ======
-            List<String> autoPassPlayers = new ArrayList<>();
-            for (String uid : room.getPendingAoePlayers()) {
-                Player ap = getPlayer(room, uid);
-                if (ap != null && ap.getHandCards().isEmpty()) {
-                    autoPassPlayers.add(uid);
+            if (room.getPendingAoePlayers().isEmpty()) {
+                endAoePhase(room);
+            } else {
+                // ====== 【核心修复】：解决空手牌玩家卡死等 10 秒的 Bug ======
+                List<String> autoPassPlayers = new ArrayList<>();
+                for (String uid : room.getPendingAoePlayers()) {
+                    Player ap = getPlayer(room, uid);
+                    if (ap != null && ap.getHandCards().isEmpty()) {
+                        autoPassPlayers.add(uid);
+                    }
                 }
-            }
-            // 自动帮没牌的人点“要不起”
-            for (String uid : autoPassPlayers) {
-                respondAoe(roomId, uid, null);
+                // 自动帮没牌的人点“要不起”
+                for (String uid : autoPassPlayers) {
+                    respondAoe(roomId, uid, null);
+                }
             }
         }
     }
@@ -335,53 +339,62 @@ public class GameService {
             endAoePhase(room);
         }
     }
+
+    private void ensureNoPendingResolution(GameRoom room, String actionName) {
+        if (room.getCurrentAoeType() != null || !room.getPendingAoePlayers().isEmpty()) {
+            throw new RuntimeException("当前有待处理结算，无法" + actionName + "！");
+        }
+    }
+
     /**
      * 回合前：弃置1张，摸1张
      */
     public boolean replaceCard(String roomId, String userId, Card discardCard) {
         GameRoom room = roomMap.get(roomId);
-        Player player = getPlayer(room, userId);
+        if (room == null) return false;
 
-        if (room != null && room.getSettings().containsKey("jdsr_target")
-                && userId.equals(room.getSettings().get("jdsr_target"))) {
-            throw new RuntimeException("借刀期间不能使用技能！");
-        }
-        if (room == null || player == null || !isPlayerTurn(room, userId) || player.isHasReplacedCardThisTurn()) {
-            log.warn("玩家 [{}] 换牌失败：可能非当前回合，或本回合已经换过牌", userId);
-            return false;
-        }
-
-        // 移除手牌并加入弃牌堆（增强容错版）
-        boolean removed = false;
-        Iterator<Card> iterator = player.getHandCards().iterator();
-        while (iterator.hasNext()) {
-            Card handCard = iterator.next();
-            // ====== 【核心修复 2】：制衡时必须同时校验“点数”和“花色”！ ======
-            if (handCard.getSuit().equals(discardCard.getSuit()) &&
-                    handCard.getRank().trim().equalsIgnoreCase(discardCard.getRank().trim())) {
-                iterator.remove();
-                removed = true;
-                break;
+        synchronized (room) {
+            Player player = getPlayer(room, userId);
+            if (room.getSettings().containsKey("jdsr_target")
+                    && userId.equals(room.getSettings().get("jdsr_target"))) {
+                throw new RuntimeException("借刀期间不能使用技能！");
             }
+            if (player == null || !isPlayerTurn(room, userId) || player.isHasReplacedCardThisTurn()) {
+                log.warn("玩家 [{}] 换牌失败：可能非当前回合，或本回合已经换过牌", userId);
+                return false;
+            }
+            ensureNoPendingResolution(room, "使用技能");
+
+            // 移除手牌并加入弃牌堆（增强容错版）
+            boolean removed = false;
+            Iterator<Card> iterator = player.getHandCards().iterator();
+            while (iterator.hasNext()) {
+                Card handCard = iterator.next();
+                // ====== 【核心修复 2】：制衡时必须同时校验“点数”和“花色”！ ======
+                if (handCard.getSuit().equals(discardCard.getSuit()) &&
+                        handCard.getRank().trim().equalsIgnoreCase(discardCard.getRank().trim())) {
+                    iterator.remove();
+                    removed = true;
+                    break;
+                }
+            }
+
+            if (!removed) {
+                log.warn("玩家 [{}] 换牌失败：手牌中未找到待弃置的牌 {}", userId, discardCard);
+                return false;
+            }
+
+            room.getDiscardPile().add(discardCard);
+
+            Card newCard = drawCard(room);
+            if (newCard != null) {
+                player.getHandCards().add(newCard);
+            }
+
+            player.setHasReplacedCardThisTurn(true);
+            log.info("玩家 [{}] 执行了【弃一摸一】。当前手牌 (共{}张): {}", userId, player.getHandCards().size(), player.getHandCards());
+            return true;
         }
-
-        if (!removed) {
-            log.warn("玩家 [{}] 换牌失败：手牌中未找到待弃置的牌 {}", userId, discardCard);
-            return false;
-        }
-
-        room.getDiscardPile().add(discardCard);
-
-        // 摸一张新牌
-        // 摸一张新牌
-        Card newCard = drawCard(room);
-        if (newCard != null) {
-            player.getHandCards().add(newCard);
-        }
-
-        player.setHasReplacedCardThisTurn(true);
-        log.info("玩家 [{}] 执行了【弃一摸一】。当前手牌 (共{}张): {}", userId, player.getHandCards().size(), player.getHandCards());
-        return true;
     }
 
     /**
@@ -395,6 +408,7 @@ public class GameService {
         synchronized (room) {
             Player player = getPlayer(room, userId);
             if (player == null || !isPlayerTurn(room, userId)) return;
+            ensureNoPendingResolution(room, "要不起");
 
             // 【防御】：若此刻玩家已经 LOST/WON（例如苦肉爆牌瞬间，前端倒计时滞后触发 PASS），
             // 不能再给他发惩罚牌，直接把回合让给下家。
@@ -512,9 +526,7 @@ public class GameService {
             if (player.isGuixinDisabled()) {
                 throw new RuntimeException("归心已禁用，需要保护他人要不起后解除！");
             }
-            if (room.getCurrentAoeType() != null) {
-                throw new RuntimeException("当前结算中，无法使用归心！");
-            }
+            ensureNoPendingResolution(room, "使用归心");
             if (room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"))) {
                 throw new RuntimeException("借刀期间不能使用技能！");
             }
@@ -696,6 +708,7 @@ public class GameService {
         synchronized (room) {
             Player player = getPlayer(room, userId);
             if (player == null || !isPlayerTurn(room, userId)) return false;
+            ensureNoPendingResolution(room, "出牌");
 
             // ====== 【防御】：清除上一次铁骑判定可能残留的 settings ======
             // 若上一次出牌来自 Bot 通道但未能广播/消费 tieqi 字段，会被本次出牌误读。
@@ -1656,52 +1669,56 @@ public class GameService {
     public void useGushou(String roomId, String userId) {
 
         GameRoom room = getRoom(roomId);
-        Player player = getPlayer(room, userId);
-        if (room == null || player == null || !isPlayerTurn(room, userId)) return;
-        if (room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"))) throw new RuntimeException("借刀期间不能使用技能！");
+        if (room == null) return;
+        synchronized (room) {
+            Player player = getPlayer(room, userId);
+            if (player == null || !isPlayerTurn(room, userId)) return;
+            ensureNoPendingResolution(room, "使用技能");
+            if (room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"))) throw new RuntimeException("借刀期间不能使用技能！");
 
-        if (player.isHasUsedSkillThisTurn()) {
-            throw new RuntimeException("本回合已使用过技能！");
-        }
+            if (player.isHasUsedSkillThisTurn()) {
+                throw new RuntimeException("本回合已使用过技能！");
+            }
 
-        if (startGuixinDecision(room, userId, GUIXIN_SOURCE_GUSHOU)) {
-            return;
-        }
+            if (startGuixinDecision(room, userId, GUIXIN_SOURCE_GUSHOU)) {
+                return;
+            }
 
-        player.setHasUsedSkillThisTurn(true);
-        log.info("玩家 [{}] 主动发动固守，摸 4 张牌", userId);
+            player.setHasUsedSkillThisTurn(true);
+            log.info("玩家 [{}] 主动发动固守，摸 4 张牌", userId);
 
-        for (int i = 0; i < 4; i++) {
-            Card c = drawCard(room);
-            if (c != null) player.getHandCards().add(c);
-        }
-        room.getSettings().put("gushou_active_" + userId, true);
+            for (int i = 0; i < 4; i++) {
+                Card c = drawCard(room);
+                if (c != null) player.getHandCards().add(c);
+            }
+            room.getSettings().put("gushou_active_" + userId, true);
 
-        // 检查是否被撑死淘汰
-        if (player.getHandCards().size() > 14) {
-            player.setStatus("LOST");
-            checkOverloadAndWin(room, player);
+            // 检查是否被撑死淘汰
+            if (player.getHandCards().size() > 14) {
+                player.setStatus("LOST");
+                checkOverloadAndWin(room, player);
 
-            // ====== 【核心修复】：爆牌后，立刻清点存活人数，触发直接躺赢 ======
-            long aliveCount = room.getPlayers().stream().filter(p -> "PLAYING".equals(p.getStatus())).count();
-            if (aliveCount <= 1) {
-                for (Player p : room.getPlayers()) {
-                    if ("PLAYING".equals(p.getStatus())) p.setStatus("WON");
+                // ====== 【核心修复】：爆牌后，立刻清点存活人数，触发直接躺赢 ======
+                long aliveCount = room.getPlayers().stream().filter(p -> "PLAYING".equals(p.getStatus())).count();
+                if (aliveCount <= 1) {
+                    for (Player p : room.getPlayers()) {
+                        if ("PLAYING".equals(p.getStatus())) p.setStatus("WON");
+                    }
                 }
             }
-        }
 
-        // 如果游戏已经结束，立刻阻断，绝不交出出牌权！
-        boolean gameEnded = room.getPlayers().stream().anyMatch(p -> "WON".equals(p.getStatus()));
-        if (gameEnded) return;
+            // 如果游戏已经结束，立刻阻断，绝不交出出牌权！
+            boolean gameEnded = room.getPlayers().stream().anyMatch(p -> "WON".equals(p.getStatus()));
+            if (gameEnded) return;
 
-        nextTurn(room);
+            nextTurn(room);
 
-        // 手动清空桌面
-        Player nextPlayer = room.getPlayers().get(room.getCurrentTurnIndex());
-        if (nextPlayer.getUserId().equals(room.getLastPlayPlayerId())) {
-            if (room.getLastPlayedCards() != null) room.getLastPlayedCards().clear();
-            room.setLastPlayPlayerId("");
+            // 手动清空桌面
+            Player nextPlayer = room.getPlayers().get(room.getCurrentTurnIndex());
+            if (nextPlayer.getUserId().equals(room.getLastPlayPlayerId())) {
+                if (room.getLastPlayedCards() != null) room.getLastPlayedCards().clear();
+                room.setLastPlayPlayerId("");
+            }
         }
     }
 
@@ -1740,88 +1757,94 @@ public class GameService {
      */
     public boolean useKurou(String roomId, String userId, List<Card> cards) {
         GameRoom room = getRoom(roomId);
-        Player player = getPlayer(room, userId);
-        if (room == null || player == null || !isPlayerTurn(room, userId)) {
-            throw new RuntimeException("非本人回合，无法使用苦肉！");
+        if (room == null) {
+            throw new RuntimeException("房间不存在，无法使用苦肉！");
         }
-        if (room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"))) {
-            throw new RuntimeException("借刀期间不能使用技能！");
-        }
-        if (!"KUROU".equals(player.getSkill())) {
-            throw new RuntimeException("你没有选择苦肉技能！");
-        }
-        // 觉醒后弃黑牌挂起期间禁止再发动苦肉，避免状态错乱
-        if (player.isKurouPendingAwakenDiscard()) {
-            throw new RuntimeException("请先处理觉醒后的弃置选择！");
-        }
-        if (player.getKurouUsesThisTurn() >= 2) {
-            throw new RuntimeException("本回合苦肉已使用 2 次！");
-        }
-        if (cards == null || cards.size() != 2) {
-            throw new RuntimeException("苦肉必须弃置 2 张牌！");
-        }
+        synchronized (room) {
+            Player player = getPlayer(room, userId);
+            if (player == null || !isPlayerTurn(room, userId)) {
+                throw new RuntimeException("非本人回合，无法使用苦肉！");
+            }
+            ensureNoPendingResolution(room, "使用苦肉");
+            if (room.getSettings().containsKey("jdsr_target") && userId.equals(room.getSettings().get("jdsr_target"))) {
+                throw new RuntimeException("借刀期间不能使用技能！");
+            }
+            if (!"KUROU".equals(player.getSkill())) {
+                throw new RuntimeException("你没有选择苦肉技能！");
+            }
+            // 觉醒后弃黑牌挂起期间禁止再发动苦肉，避免状态错乱
+            if (player.isKurouPendingAwakenDiscard()) {
+                throw new RuntimeException("请先处理觉醒后的弃置选择！");
+            }
+            if (player.getKurouUsesThisTurn() >= 2) {
+                throw new RuntimeException("本回合苦肉已使用 2 次！");
+            }
+            if (cards == null || cards.size() != 2) {
+                throw new RuntimeException("苦肉必须弃置 2 张牌！");
+            }
 
-        // 严谨地校验并移除手牌（参照 useLuanjian）
-        for (Card playedCard : cards) {
-            java.util.Iterator<Card> iterator = player.getHandCards().iterator();
-            boolean found = false;
-            while (iterator.hasNext()) {
-                Card handCard = iterator.next();
-                if (handCard.getSuit().equals(playedCard.getSuit())
-                        && handCard.getRank().trim().equalsIgnoreCase(playedCard.getRank().trim())) {
-                    iterator.remove();
-                    found = true;
-                    break;
+            // 严谨地校验并移除手牌（参照 useLuanjian）
+            for (Card playedCard : cards) {
+                java.util.Iterator<Card> iterator = player.getHandCards().iterator();
+                boolean found = false;
+                while (iterator.hasNext()) {
+                    Card handCard = iterator.next();
+                    if (handCard.getSuit().equals(playedCard.getSuit())
+                            && handCard.getRank().trim().equalsIgnoreCase(playedCard.getRank().trim())) {
+                        iterator.remove();
+                        found = true;
+                        break;
+                    }
                 }
+                if (!found) throw new RuntimeException("手牌中不存在待弃置的牌！");
             }
-            if (!found) throw new RuntimeException("手牌中不存在待弃置的牌！");
-        }
 
-        room.getDiscardPile().addAll(cards);
+            room.getDiscardPile().addAll(cards);
 
-        // 摸 4 张
-        for (int i = 0; i < 4; i++) {
-            Card c = drawCard(room);
-            if (c != null) player.getHandCards().add(c);
-        }
+            // 摸 4 张
+            for (int i = 0; i < 4; i++) {
+                Card c = drawCard(room);
+                if (c != null) player.getHandCards().add(c);
+            }
 
-        // 累计计数 + 觉醒判定
-        boolean awakenTriggered = false;
-        player.setKurouUsesThisTurn(player.getKurouUsesThisTurn() + 1);
-        player.setKurouUseCount(player.getKurouUseCount() + 1);
-        if (player.getKurouUseCount() >= 3 && !player.isKurouAwakened()) {
-            player.setKurouAwakened(true);
-            awakenTriggered = true;
-            log.info("玩家 [{}] 苦肉累计使用 {} 次，触发永久觉醒！",
-                    userId, player.getKurouUseCount());
-        }
-        log.info("玩家 [{}] 发动苦肉：弃 2 摸 4（手牌 {} 张，本回合 {} 次，累计 {} 次{}）",
-                userId, player.getHandCards().size(), player.getKurouUsesThisTurn(), player.getKurouUseCount(),
-                player.isKurouAwakened() ? "，已觉醒" : "");
+            // 累计计数 + 觉醒判定
+            boolean awakenTriggered = false;
+            player.setKurouUsesThisTurn(player.getKurouUsesThisTurn() + 1);
+            player.setKurouUseCount(player.getKurouUseCount() + 1);
+            if (player.getKurouUseCount() >= 3 && !player.isKurouAwakened()) {
+                player.setKurouAwakened(true);
+                awakenTriggered = true;
+                log.info("玩家 [{}] 苦肉累计使用 {} 次，触发永久觉醒！",
+                        userId, player.getKurouUseCount());
+            }
+            log.info("玩家 [{}] 发动苦肉：弃 2 摸 4（手牌 {} 张，本回合 {} 次，累计 {} 次{}）",
+                    userId, player.getHandCards().size(), player.getKurouUsesThisTurn(), player.getKurouUseCount(),
+                    player.isKurouAwakened() ? "，已觉醒" : "");
 
-        // 爆牌（>14）即输，参照固守逻辑
-        if (player.getHandCards().size() > 14) {
-            checkOverloadAndWin(room, player);
-            long aliveCount = room.getPlayers().stream()
-                    .filter(p -> "PLAYING".equals(p.getStatus())).count();
-            if (aliveCount <= 1) {
-                for (Player p : room.getPlayers()) {
-                    if ("PLAYING".equals(p.getStatus())) p.setStatus("WON");
+            // 爆牌（>14）即输，参照固守逻辑
+            if (player.getHandCards().size() > 14) {
+                checkOverloadAndWin(room, player);
+                long aliveCount = room.getPlayers().stream()
+                        .filter(p -> "PLAYING".equals(p.getStatus())).count();
+                if (aliveCount <= 1) {
+                    for (Player p : room.getPlayers()) {
+                        if ("PLAYING".equals(p.getStatus())) p.setStatus("WON");
+                    }
                 }
+                // 【关键修复】：自爆后立刻把回合交给下家，否则当前回合仍挂在死者身上，
+                // 倒计时到期会触发前端自动 PASS，把 2 张惩罚牌塞回已经 LOST 的玩家。
+                boolean gameEnded = room.getPlayers().stream().anyMatch(p -> "WON".equals(p.getStatus()));
+                if (!gameEnded && !"PLAYING".equals(player.getStatus())) {
+                    // 苦肉阶段本人尚未对当前trick做出反应，复用 pass 的收尾逻辑即可
+                    // （nextTurn + 若新回合对应 lastPlayPlayerId 则清空桌面）
+                    handleNextTurnAfterPass(room);
+                }
+                return awakenTriggered;
             }
-            // 【关键修复】：自爆后立刻把回合交给下家，否则当前回合仍挂在死者身上，
-            // 倒计时到期会触发前端自动 PASS，把 2 张惩罚牌塞回已经 LOST 的玩家。
-            boolean gameEnded = room.getPlayers().stream().anyMatch(p -> "WON".equals(p.getStatus()));
-            if (!gameEnded && !"PLAYING".equals(player.getStatus())) {
-                // 苦肉阶段本人尚未对当前trick做出反应，复用 pass 的收尾逻辑即可
-                // （nextTurn + 若新回合对应 lastPlayPlayerId 则清空桌面）
-                handleNextTurnAfterPass(room);
-            }
+
+            // 注意：回合不流转，允许同一回合再用、再出牌
             return awakenTriggered;
         }
-
-        // 注意：回合不流转，允许同一回合再用、再出牌
-        return awakenTriggered;
     }
 
     /**

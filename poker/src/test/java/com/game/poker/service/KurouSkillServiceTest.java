@@ -179,6 +179,45 @@ class KurouSkillServiceTest {
     }
 
     @Test
+    void staleTimeoutActionCannotOverrideKurouAwakenPlay() {
+        GameService service = new GameService();
+        GameRoom room = makeRoom(service);
+        Player me = room.getPlayers().get(0);
+
+        Card firstPlay = Card.getCard("\u2665", "3", 1);
+        Card staleAutoPlay = Card.getCard("\u2665", "4", 2);
+        Card pendingBlack = Card.getCard("\u2660", "5", 3);
+        me.getHandCards().clear();
+        me.getHandCards().addAll(List.of(firstPlay, staleAutoPlay, pendingBlack));
+        me.setKurouAwakened(true);
+        me.setKurouUseCount(3);
+
+        assertTrue(service.playCards(ROOM_ID, ME, new ArrayList<>(List.of(firstPlay))));
+        assertEquals("KUROU_AWAKEN_DISCARD", room.getCurrentAoeType());
+        assertEquals(1, room.getPendingAoePlayers().size());
+        assertTrue(room.getPendingAoePlayers().contains(ME));
+        assertEquals(List.of(firstPlay), room.getLastPlayedCards());
+        assertTrue(me.getHandCards().contains(staleAutoPlay));
+
+        RuntimeException playEx = assertThrows(RuntimeException.class,
+                () -> service.playCards(ROOM_ID, ME, new ArrayList<>(List.of(staleAutoPlay))));
+        assertTrue(playEx.getMessage().contains("待处理结算"));
+
+        RuntimeException passEx = assertThrows(RuntimeException.class,
+                () -> service.passTurn(ROOM_ID, ME));
+        assertTrue(passEx.getMessage().contains("待处理结算"));
+
+        assertEquals("KUROU_AWAKEN_DISCARD", room.getCurrentAoeType());
+        assertEquals(1, room.getPendingAoePlayers().size());
+        assertTrue(room.getPendingAoePlayers().contains(ME));
+        assertEquals(List.of(firstPlay), room.getLastPlayedCards());
+        assertTrue(me.getHandCards().contains(staleAutoPlay));
+        assertTrue(me.getHandCards().contains(pendingBlack));
+        assertFalse(room.getDiscardPile().contains(firstPlay));
+        assertEquals(0, room.getCurrentTurnIndex());
+    }
+
+    @Test
     void awakenDiscardRejectsNonBlackCard() {
         GameService service = new GameService();
         GameRoom room = makeRoom(service);
